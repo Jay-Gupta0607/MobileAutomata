@@ -1706,6 +1706,73 @@ mod tests {
         assert!(a.contains("\"status\":\"explores\"") && b.contains("\"status\":\"explores\"") && a != b);
     }
 
+    /// Deterministic small random connected graphs (fixed seed, xorshift): a random spanning tree plus
+    /// a few extra edges, so trees, cycles and denser graphs all appear.
+    fn random_connected_graphs(count: usize, seed: u64) -> Vec<(u8, String)> {
+        let mut x = seed;
+        let mut next = move |below: u64| -> u64 {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x % below
+        };
+        let mut graphs = Vec::new();
+        for _ in 0..count {
+            let n = 3 + next(10) as u8; // 3 to 12 vertices
+            let mut edges: Vec<(u8, u8)> = (1..n).map(|v| (next(v as u64) as u8, v)).collect();
+            for _ in 0..next(n as u64 + 5) {
+                let (a, b) = (next(n as u64) as u8, next(n as u64) as u8);
+                if a != b {
+                    edges.push((a.min(b), a.max(b)));
+                }
+            }
+            edges.sort();
+            edges.dedup();
+            graphs.push((n, edges.iter().map(|(a, b)| format!("{}-{}", a, b)).collect::<Vec<_>>().join(",")));
+        }
+        graphs
+    }
+
+    #[test]
+    fn agen6_explores_random_connected_graphs_from_every_start() {
+        // Definition 1 for many graphs: from every start vertex, against every adversary, every vertex
+        // is visited and the agent stops on the start.  (The paper proves it; this guards the code.)
+        let a6 = Rule { k: 6, table: Map::default(), default: Some(Formula::AGen6), terminating: true };
+        let mut pairs = 0;
+        for (n, edges) in random_connected_graphs(40, 0x9E37_79B9_7F4A_7C15) {
+            for start in 0..n {
+                let g = Graph::parse(&format!("{} {} {}", n, start, edges)).unwrap();
+                match exact_game(&g, &a6, 2_000_000) {
+                    Outcome::Explores { trace, .. } => {
+                        assert_eq!(trace.stopped_at, Some(start), "graph {} {} from {}", n, edges, start);
+                        assert_eq!(trace.unvisited, 0);
+                        assert_eq!(trace.steps.last().unwrap().act.target, STOP);
+                    }
+                    _ => panic!("A_Gen6 must explore graph `{} {}` from vertex {}", n, edges, start),
+                }
+                pairs += 1;
+            }
+        }
+        assert!(pairs >= 200, "only {} (graph, start) pairs were checked", pairs);
+    }
+
+    #[test]
+    fn the_random_graph_check_can_fail() {
+        // negative control: sigma* never stops, so under the paper model the same graphs must be rejected
+        let sigma = Rule { k: 5, table: Map::default(), default: Formula::parse("sigma"), terminating: true };
+        let graphs = random_connected_graphs(5, 0x9E37_79B9_7F4A_7C15);
+        for (n, edges) in graphs {
+            let g = Graph::parse(&format!("{} 0 {}", n, edges)).unwrap();
+            assert!(matches!(exact_game(&g, &sigma, 2_000_000), Outcome::Fails { .. }), "graph {} {}", n, edges);
+        }
+        // and the generator yields connected graphs of the intended sizes, not the same one over and over
+        let many = random_connected_graphs(40, 0x9E37_79B9_7F4A_7C15);
+        assert!(many.iter().all(|(n, e)| Graph::parse(&format!("{} 0 {}", n, e)).is_ok()), "every generated graph is connected");
+        let sizes: std::collections::BTreeSet<u8> = many.iter().map(|(n, _)| *n).collect();
+        assert!(sizes.len() >= 6 && sizes.iter().any(|&n| n >= 10), "sizes {:?}", sizes);
+        assert!(many.iter().map(|(_, e)| e.clone()).collect::<std::collections::BTreeSet<_>>().len() >= 35);
+    }
+
     #[test]
     fn stop_makes_a_terminal_position_only_in_the_paper_model() {
         let g = Graph::parse("2 0 0-1").unwrap();
