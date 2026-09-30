@@ -1079,10 +1079,11 @@ struct Request {
     row: Option<String>,
     model: String,
     prefer: Vec<u8>,
+    bad_prefer: Vec<String>,
 }
 
 fn parse_request(input: &str) -> Request {
-    let mut r = Request { cmd: String::new(), k: 5, graph: None, table: Map::default(), bad_rows: Vec::new(), default: None, bad_default: None, cap: 1_000_000, walks: 64, budget: 200_000, colours: Vec::new(), cur: None, vis: Vec::new(), row: None, model: String::new(), prefer: Vec::new() };
+    let mut r = Request { cmd: String::new(), k: 5, graph: None, table: Map::default(), bad_rows: Vec::new(), default: None, bad_default: None, cap: 1_000_000, walks: 64, budget: 200_000, colours: Vec::new(), cur: None, vis: Vec::new(), row: None, model: String::new(), prefer: Vec::new(), bad_prefer: Vec::new() };
     let mut in_table = false;
     for line in input.lines() {
         let line = line.trim();
@@ -1129,7 +1130,16 @@ fn parse_request(input: &str) -> Request {
             "vis" => r.vis = val.split_whitespace().filter_map(|x| x.parse().ok()).collect(),
             "row" => r.row = Some(val.to_string()),
             "model" => r.model = val.to_string(),
-            "prefer" => r.prefer = val.split_whitespace().filter_map(|x| x.parse().ok()).collect(),
+            "prefer" => {
+                // a later `prefer` line replaces an earlier one; a token that is not a vertex number is an error
+                r.prefer.clear();
+                for tok in val.split_whitespace() {
+                    match tok.parse::<u8>() {
+                        Ok(v) => r.prefer.push(v),
+                        Err(_) => r.bad_prefer.push(tok.to_string()),
+                    }
+                }
+            }
             "table" => in_table = true,
             _ => {}
         }
@@ -1163,6 +1173,9 @@ pub fn handle(input: &str) -> String {
     }
     if !r.bad_rows.is_empty() {
         return err(&format!("bad table line: {}", r.bad_rows[0]));
+    }
+    if let Some(tok) = r.bad_prefer.first() {
+        return err(&format!("prefer: {} is not a vertex number", tok));
     }
     for (row, act) in &r.table {
         if row.own >= r.k || act.paint >= r.k || (act.target != STAY && act.target != STOP && act.target >= r.k) || row.cnt[r.k as usize..].iter().any(|&c| c > 0) {
@@ -1678,6 +1691,15 @@ mod tests {
         assert!(rep.contains("\"status\":\"fails\"") && rep.contains("\"reason\":\"never_stops\"") && !rep.contains("\"repeat_at\":null"), "{}", rep);
         // a vertex outside the graph in `prefer` is an error
         assert!(handle("cmd play\nk 6\ngraph 3 0 0-1,1-2\ndefault agen6\nprefer 0 7\n").contains("not in the graph"));
+        // and so is a token that is not a vertex number at all: it must not be dropped silently
+        for bad in ["1 two 0", "-1", "300", "1,2", "0x1"] {
+            let out = handle(&format!("cmd play\nk 6\ngraph 3 0 0-1,1-2\ndefault agen6\nprefer {}\n", bad));
+            assert!(out.contains("\"status\":\"error\"") && out.contains("is not a vertex number"), "prefer {}: {}", bad, out);
+        }
+        // a later prefer line replaces the earlier one
+        let two = handle("cmd play\nk 6\ngraph 4 0 0-1,0-2,1-3\ndefault agen6\nprefer 2 1 3 0\nprefer 1 2 3 0\n");
+        let one = handle("cmd play\nk 6\ngraph 4 0 0-1,0-2,1-3\ndefault agen6\nprefer 1 2 3 0\n");
+        assert_eq!(two, one);
         // a preference for the other neighbour changes the order of a tie, not the outcome
         let a = handle("cmd play\nk 6\ngraph 4 0 0-1,0-2,1-3\ndefault agen6\nprefer 1 2 3 0\n");
         let b = handle("cmd play\nk 6\ngraph 4 0 0-1,0-2,1-3\ndefault agen6\nprefer 2 1 3 0\n");

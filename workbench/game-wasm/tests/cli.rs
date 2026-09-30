@@ -164,3 +164,13 @@ fn a_request_file_is_sent_exactly_as_written() {
     assert_eq!(code(&run(&["play", "--request-file", f.path()])), 64);
     assert_eq!(code(&run(&["--request-file", "no-such-file.req"])), 64);
 }
+
+#[test]
+fn prefer_must_be_vertex_numbers() {
+    let o = run(&["play", "--graph", TREE, "--rule", "agen6", "--prefer", "1 two 0"]);
+    assert_eq!(code(&o), 64, "{}", stdout(&o));
+    assert!(stdout(&o).contains("\"two\"") || stdout(&o).contains("two is not a vertex number"), "{}", stdout(&o));
+    // commas work as separators, a vertex outside the graph is still an error
+    assert_eq!(code(&run(&["play", "--graph", TREE, "--rule", "agen6", "--prefer", "1,2,3,0"])), 0);
+    assert_eq!(code(&run(&["play", "--graph", TREE, "--rule", "agen6", "--prefer", "1,9"])), 64);
+}
