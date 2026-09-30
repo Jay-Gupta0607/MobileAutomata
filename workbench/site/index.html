@@ -54,7 +54,7 @@ aside{border-left:1px solid var(--rule);background:var(--surface);display:flex;f
 .banner.neutral{background:var(--pen-soft);color:var(--ink)}
 .pills{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .pill{border:1px solid var(--rule);border-radius:999px;padding:2px 10px;font-size:12px;background:var(--surface);color:var(--ink)}
-.pill b{font-weight:600;margin-right:4px}
+.pill b{font-weight:600}
 .pill.good{background:var(--good-bg);color:var(--good);border-color:transparent}
 .pill.bad{background:var(--bad-bg);color:var(--bad);border-color:transparent}
 table{border-collapse:collapse;width:100%;font-size:12.5px}
@@ -86,7 +86,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
     <button type="button" data-mode="start" aria-pressed="false" title="Click a vertex to make it the start (S)">Set start</button>
   </div>
   <div class="group"><label for="k">colours</label><select id="k"><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option></select></div>
-  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I (17)</option><option value="sketch2">Sketch II (14)</option><option value="paw">paw + pendant (k=2 killer)</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path">A_Gen6 · path (hand trace 1)</option><option value="agen6triangle">A_Gen6 · triangle (hand trace 2)</option><option value="agen6tree">A_Gen6 · tree (hand trace 3)</option><option value="agen6sketch1">A_Gen6 · Sketch I</option><option value="clear">empty canvas</option></select></div>
+  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I (17)</option><option value="sketch2">Sketch II (14)</option><option value="paw">paw + pendant (k=2 killer)</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path (hand trace 1)</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle (hand trace 2)</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree (hand trace 3)</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="clear">empty canvas</option></select></div>
   <div class="group"><button type="button" id="b-import-graph">Import / export graph</button></div>
   <div class="group small" id="wasm-status">loading engine…</div>
 </header>
@@ -565,7 +565,10 @@ function loadReplay(trace) { resetPlay(); state.replay = { steps: trace.steps, i
 const NAMES = (i) => String(i);
 function render() { renderGraph(); renderPlay(); renderRules(); renderLegend(); renderHint(); }
 // A_Gen6 names its six colours (init, path, ...): used whenever the rule in use is A_Gen6
-function namedColours() { return state.def === 'agen6' || /^\s*\/\/\s*A_Gen6\b/.test(state.algoSrc || ''); }
+function namedColours() {
+  const code = state.algoSrc || ''; // code in use answers before the fallback: its colours are A_Gen6's only if it is the A_Gen6 template
+  return code ? /^\s*\/\/\s*A_Gen6\b/.test(code) : state.def === 'agen6';
+}
 function cname(c) { return colourLabel(c, namedColours()); }
 function renderLegend() { $('#legend').innerHTML = [...Array(state.k).keys()].map((c) => `<span><span class="sw" style="background:${PAL[c]}"></span>${namedColours() ? cname(c) : c === 0 ? 'white' : c}</span>`).join('') + '<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent</span><span><span class="sw" style="border:2px dashed var(--bad)"></span>never visited</span>'; }
 function renderHint() {
@@ -600,20 +603,23 @@ function renderGraph() {
 function playPaperStatus(p) {
   return paperStatus({ visited: p.vis.size, n: state.nodes.length, cur: p.cur, start: state.start, stopped: !!(p.done && p.done.kind === 'stopped'), cycle: !!(p.done && p.done.kind === 'confined') });
 }
+// one indicator: a label, its value, good / bad / neither, and what it means (the colon and space keep the text readable)
+function pill(label, value, state, title) { return `<span class="pill ${state}" title="${title}"><b>${label}:</b> ${value}</span>`; }
+function pills3(cov, ret, term) { return `<div class="pills" role="group" aria-label="the three parts of exploring">${cov}${ret}${term}</div>`; }
 // coverage, return and termination: three separate facts, as in Definition 1 of the paper
 function pillsHtml(p) {
   const n = state.nodes.length, st = playPaperStatus(p), over = !!p.done, stopped = st.termination === 'stopped';
-  const cov = `<span class="pill ${st.covered ? 'good' : over ? 'bad' : ''}" title="coverage: every vertex is visited"><b>coverage</b>${p.vis.size} of ${n} visited</span>`;
+  const cov = pill('coverage', `${p.vis.size} of ${n} visited`, st.covered ? 'good' : over ? 'bad' : '', 'every vertex is visited');
   const where = stopped ? (st.onStart ? 'stopped on the start vertex' : `stopped on ${NAMES(p.cur)}, not the start ${NAMES(state.start)}`) : (st.onStart ? 'on the start vertex' : `away from the start ${NAMES(state.start)}`);
-  const ret = `<span class="pill ${stopped ? (st.onStart ? 'good' : 'bad') : ''}" title="return: the agent ends on the start vertex"><b>return</b>${where}</span>`;
-  const term = `<span class="pill ${stopped ? 'good' : st.termination === 'never' ? 'bad' : ''}" title="termination: the agent stops"><b>termination</b>${{ running: 'running', stopped: 'stopped', never: 'never stops (a position repeats)' }[st.termination]}</span>`;
-  return `<div class="pills" role="group" aria-label="the three parts of exploring">${cov}${ret}${term}</div>`;
+  const ret = pill('return', where, stopped ? (st.onStart ? 'good' : 'bad') : '', 'the agent ends on the start vertex');
+  const term = pill('termination', { running: 'running', stopped: 'stopped', never: 'never stops (a position repeats)' }[st.termination], stopped ? 'good' : st.termination === 'never' ? 'bad' : '', 'the agent stops');
+  return pills3(cov, ret, term);
 }
 function stoppedBanner(p) {
   const ps = playPaperStatus(p), steps = p.steps.length, unv = p.done.unvisited;
-  if (ps.outcome === 'explores') return `<div class="banner good"><b>Explores (paper model).</b> Every vertex was visited and the agent stopped on the start vertex ${NAMES(state.start)} after ${steps} steps.</div>`;
-  if (ps.outcome === 'stopped_early') return `<div class="banner bad"><b>Stopped early.</b> The agent stopped on ${NAMES(p.cur)} after ${steps} steps, but <b>${unv.map(NAMES).join(', ')}</b> ${unv.length === 1 ? 'was' : 'were'} never visited.</div>`;
-  return `<div class="banner bad"><b>Stopped away from the start.</b> Every vertex was visited, but the agent stopped on ${NAMES(p.cur)}, not on the start vertex ${NAMES(state.start)}.</div>`;
+  if (ps.outcome === 'explores') return `<div class="banner good"><b>Explored in this play (paper model).</b> Every vertex was visited and the agent stopped on the start vertex ${NAMES(state.start)} after ${steps} steps. These are this play's choices; the Analysis tab checks every adversary.</div>`;
+  if (ps.outcome === 'stopped_early') return `<div class="banner bad"><b>Stopped early in this play.</b> The agent stopped on ${NAMES(p.cur)} after ${steps} steps, but <b>${unv.map(NAMES).join(', ')}</b> ${unv.length === 1 ? 'was' : 'were'} never visited.</div>`;
+  return `<div class="banner bad"><b>Stopped away from the start in this play.</b> Every vertex was visited, but the agent stopped on ${NAMES(p.cur)}, not on the start vertex ${NAMES(state.start)}.</div>`;
 }
 function renderPlay() {
   const p = state.play, box = $('#playstatus');
@@ -635,7 +641,7 @@ function renderPlay() {
   } else if (p.done) {
     if (p.done.kind === 'explored') s += `<div class="banner good">Explored: all ${state.nodes.length} vertices visited in ${p.steps.length} steps.</div>`;
     else if (p.done.kind === 'stopped') s += stoppedBanner(p);
-    else if (p.done.kind === 'confined' && paperMode()) s += `<div class="banner bad"><b>Never stops.</b> The position after step ${p.steps.length} already occurred before step ${p.done.repeatAt + 1}, so these ${p.steps.length - p.done.repeatAt} steps repeat for ever. ${p.done.unvisited.length ? `Never visited: <b>${p.done.unvisited.map(NAMES).join(', ')}</b>.` : 'Every vertex was visited, but the agent does not stop.'}</div>`;
+    else if (p.done.kind === 'confined' && paperMode()) s += `<div class="banner bad"><b>Never stops, under these choices.</b> The position after step ${p.steps.length} already occurred before step ${p.done.repeatAt + 1}, so these ${p.steps.length - p.done.repeatAt} steps repeat for ever unless the adversary chooses differently. ${p.done.unvisited.length ? `Never visited: <b>${p.done.unvisited.map(NAMES).join(', ')}</b>.` : 'Every vertex was visited, but the agent does not stop.'}</div>`;
     else if (p.done.kind === 'confined') s += `<div class="banner bad">Trapped: the position after step ${p.steps.length} already occurred before step ${p.done.repeatAt + 1}, so these ${p.steps.length - p.done.repeatAt} steps repeat for ever. Never visited: <b>${p.done.unvisited.map(NAMES).join(', ')}</b>.</div>`;
     else s += `<div class="banner bad">${p.done.message}</div>`;
   }
@@ -685,10 +691,10 @@ function switchTab(name) { document.querySelectorAll('.tabs button').forEach((b)
 // the same three facts as in the Play tab, from the engine's indicators
 function analysisPills(r) {
   const ind = r.indicators, t = r.trace;
-  const cov = `<span class="pill ${ind.visited_all ? 'good' : 'bad'}"><b>coverage</b>${ind.visited_all ? 'every vertex visited' : `${t.unvisited.map(NAMES).join(', ')} never visited`}</span>`;
-  const ret = ind.stopped ? `<span class="pill ${ind.stopped_at_start ? 'good' : 'bad'}"><b>return</b>${ind.stopped_at_start ? 'stops on the start vertex' : `stops on ${NAMES(t.stopped_at)}, not the start`}</span>` : '<span class="pill"><b>return</b>never stops, so never ends anywhere</span>';
-  const term = `<span class="pill ${ind.stopped ? 'good' : 'bad'}"><b>termination</b>${ind.stopped ? 'stops' : 'never stops'}</span>`;
-  return `<div class="pills" role="group" aria-label="the three parts of exploring">${cov}${ret}${term}</div>`;
+  const cov = pill('coverage', ind.visited_all ? 'every vertex visited' : `${t.unvisited.map(NAMES).join(', ')} never visited`, ind.visited_all ? 'good' : 'bad', 'every vertex is visited');
+  const ret = ind.stopped ? pill('return', ind.stopped_at_start ? 'stops on the start vertex' : `stops on ${NAMES(t.stopped_at)}, not the start`, ind.stopped_at_start ? 'good' : 'bad', 'the agent ends on the start vertex') : pill('return', 'never stops, so never ends anywhere', '', 'the agent ends on the start vertex');
+  const term = pill('termination', ind.stopped ? 'stops' : 'never stops', ind.stopped ? 'good' : 'bad', 'the agent stops');
+  return pills3(cov, ret, term);
 }
 function paperSummary(r) {
   const t = r.trace, steps = t.steps.length, pills = analysisPills(r);
