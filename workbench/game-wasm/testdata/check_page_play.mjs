@@ -21,8 +21,9 @@ src = src.replace(head, 'globalThis.__ready = ' + head).replace(tail, `resetPlay
 globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus };
 })();`);
 
-// a stand-in for an element: remembers what is set on it, answers every method with itself
+// a stand-in for an element: remembers what is set on it, answers every method with itself (and notes which were called)
 const elements = new Map();
+const calls = [];
 function element(sel) {
   if (elements.has(sel)) return elements.get(sel);
   const props = Object.create(null);
@@ -36,7 +37,7 @@ function element(sel) {
       if (k === 'options' || k === 'selectedOptions') return [];
       if (k === 'querySelectorAll') return () => [];
       if (k === 'querySelector') return (s) => element(sel + ' ' + s);
-      return props[k] = (...a) => el;
+      return props[k] = (...a) => { calls.push(k); return el; };
     },
     set(_, k, v) { props[k] = v; return true; },
     apply() { return el; },
@@ -158,6 +159,19 @@ setup({ k: 4, def: 'flipsweep5', graph: '3 0 0-1,1-2' });
 same(hint(), { text: 'flipsweep5 needs at least 5 colours (now 4)', warn: true }, 'a built-in rule with a minimum');
 setup({ k: 2, def: 'sigma', graph: '3 0 0-1,1-2' });
 same(hint(), { text: '', warn: false }, 'sigma* works with any number: no hint');
+
+// 7c. a step must not scroll the panel or the page (scrollIntoView did, at every step); the ledger's own box follows
+//     the newest step only when it was already at the bottom
+setup({ k: 6, def: 'agen6', graph: '4 0 0-1,0-2,1-3' });
+const box = element('#ledgerwrap');
+Object.assign(box, { scrollHeight: 500, clientHeight: 260, scrollTop: 240 }); // scrolled to the bottom
+calls.length = 0; P.stepOnce(true); P.stepOnce(true); P.render();
+check(!calls.includes('scrollIntoView'), 'stepping does not call scrollIntoView (it scrolled the whole panel)');
+same(box.scrollTop, 500, 'the ledger box follows the newest step when it was at the bottom');
+box.scrollTop = 0; // the reader scrolled up to look at older steps
+P.stepOnce(true); P.render();
+same(box.scrollTop, 0, 'and stays where the reader put it');
+check(!calls.includes('scrollIntoView'), 'still no scrollIntoView');
 
 // 8. compiled code keeps the paper's rule number and knows that it stops
 const compiled = P.compileAlgo(P.ALGO_TEMPLATES.agen6, 6, 3);
