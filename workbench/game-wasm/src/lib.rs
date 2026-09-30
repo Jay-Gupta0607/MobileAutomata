@@ -559,7 +559,6 @@ impl Formula {
                     PATH => mv(HEAD1, STAY), // rule 10
                     NEIGH => mv(INIT, HEAD2), // rule 11
                     // FIN: the paper defines no rule, the agent is on a fin vertex only after it has stopped
-                    FIN => return None,
                     _ => return None,
                 })
             }
@@ -586,6 +585,23 @@ pub enum Answer {
 }
 
 impl Rule {
+    /// The play is over: classic, every vertex is visited; paper model, the agent has stopped.
+    pub fn over(&self, g: &Graph, p: &Pos) -> bool {
+        if self.terminating {
+            p.term
+        } else {
+            p.vis == g.full()
+        }
+    }
+    /// The agent has won: classic, every vertex is visited; paper model, it stopped on the start
+    /// vertex with every vertex visited (Definition 1 of Takahashi et al.).
+    pub fn won(&self, g: &Graph, p: &Pos) -> bool {
+        if self.terminating {
+            p.term && p.cur == g.s && p.vis == g.full()
+        } else {
+            p.vis == g.full()
+        }
+    }
     pub fn answer(&self, row: &Row) -> Answer {
         if let Some(a) = self.table.get(row) {
             return Answer::Table(*a);
@@ -657,10 +673,6 @@ fn successors(g: &Graph, p: &Pos, a: Action, terminating: bool) -> Vec<(Option<u
 /// obstruction (the rule explores) or a trapping play (it fails).
 pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     let full = g.full();
-    // classic: over as soon as every vertex is visited.  Paper model: over when the
-    // agent stops; it wins only if it stopped on the start vertex with every vertex visited.
-    let over = |p: &Pos| if rule.terminating { p.term } else { p.vis == full };
-    let won = |p: &Pos| if rule.terminating { p.term && p.cur == g.s && p.vis == full } else { p.vis == full };
     let root = Pos { chi: 0, cur: g.s, vis: 1 << g.s, term: false };
     let mut states = vec![root];
     let mut index: Map<Pos, u32> = Map::default();
@@ -671,7 +683,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     let mut i = 0usize;
     while i < states.len() {
         let p = states[i];
-        if !over(&p) {
+        if !rule.over(g, &p) {
             let row = row_at(g, p.chi, p.cur);
             let act = match rule.action(&row) {
                 Some(a) => a,
@@ -738,7 +750,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     let mut rank = vec![0u32; n];
     let mut queue: Vec<u32> = Vec::new();
     for p in 0..n {
-        if won(&states[p]) {
+        if rule.won(g, &states[p]) {
             win[p] = true;
             queue.push(p as u32);
         }
@@ -767,7 +779,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     if win[0] {
         let mut steps = Vec::new();
         let mut at = 0u32;
-        while !over(&states[at as usize]) {
+        while !rule.over(g, &states[at as usize]) {
             let p = states[at as usize];
             let act = rule.action(&row_at(g, p.chi, p.cur)).unwrap();
             let (u, j) = successors(g, &p, act, rule.terminating).into_iter().map(|(u, q)| (u, index[&q])).max_by_key(|&(_, j)| rank[j as usize]).unwrap();
@@ -861,16 +873,12 @@ pub fn walk(g: &Graph, rule: &Rule, heuristic: u8, seed: u64, budget: usize) -> 
     let mut steps: Vec<Step> = Vec::new();
     let mut rng = seed.max(1);
     loop {
-        if rule.terminating {
-            if p.term {
-                // the agent stopped: it explored only if that was on the start vertex with everything visited
-                if p.cur == g.s && p.vis == full {
-                    return Ok(None);
-                }
-                return Ok(Some(Trace { steps, repeat_at: None, unvisited: full & !p.vis, stopped_at: Some(p.cur) }));
+        if rule.over(g, &p) {
+            if rule.won(g, &p) {
+                return Ok(None);
             }
-        } else if p.vis == full {
-            return Ok(None);
+            // over but not won only happens in the paper model: the agent stopped in the wrong place
+            return Ok(Some(Trace { steps, repeat_at: None, unvisited: full & !p.vis, stopped_at: Some(p.cur) }));
         }
         // out of budget: decided only after the last position above was looked at
         if steps.len() >= budget {
@@ -972,12 +980,12 @@ fn trace_json(t: &Trace, k: u8) -> String {
     format!("{{\"repeat_at\":{},\"unvisited\":{},\"stopped_at\":{},\"steps\":[{}]}}", t.repeat_at.map_or("null".to_string(), |r| r.to_string()), mask_list(t.unvisited), t.stopped_at.map_or("null".to_string(), |v| v.to_string()), steps.join(","))
 }
 /// Why a play ended badly in the paper model.
-fn fail_reason(t: &Trace, start: u8) -> &'static str {
+fn fail_reason(t: &Trace) -> &'static str {
     match t.stopped_at {
         None => "never_stops",
         Some(_) if t.unvisited != 0 => "stopped_early",
-        Some(v) if v != start => "stopped_off_start",
-        Some(_) => "stopped_on_start",
+        // a stop on the start vertex with every vertex visited is a win, so it is never a failure
+        Some(_) => "stopped_off_start",
     }
 }
 /// Paper model: the three parts of exploring, reported separately.
@@ -992,7 +1000,7 @@ fn outcome_json(o: &Outcome, k: u8, paper: bool, start: u8) -> String {
         if !paper {
             return String::new();
         }
-        let reason = if fails { format!(",\"reason\":\"{}\"", fail_reason(t, start)) } else { String::new() };
+        let reason = if fails { format!(",\"reason\":\"{}\"", fail_reason(t)) } else { String::new() };
         format!(",\"indicators\":{}{}", indicators(t, start), reason)
     };
     match o {
