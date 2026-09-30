@@ -11,10 +11,13 @@ libraries or web fonts.
 
     sh workbench/build.sh          # needs: rustup target add wasm32-unknown-unknown
 
-produces `site/game.wasm` (~84 KB), and `site/standalone.html`, which inlines
-the engine (base64) so it opens from a `file://` URL.  `site/index.html` +
-`site/game.wasm` are for serving over HTTP (any static server, e.g.
-`python3 -m http.server` inside `site/`).
+produces `site/game.wasm` (~90 KB) and `../docs/index.html`, the same page with the engine inlined (base64),
+which opens from a `file://` URL and is what GitHub Pages serves (the build also writes `site/standalone.html`, an
+identical copy that is git-ignored, so a fresh clone has only `docs/index.html`).  `site/index.html` +
+`site/game.wasm` are for serving over HTTP (any static server, e.g. `python -m http.server 8000 --directory
+workbench/site`); the source page cannot be opened from disk.  Needs Rust 1.78 or newer with the `wasm32` target
+(Windows: also the Visual Studio C++ Build Tools), `sh` and `python3`; the `node testdata/check_*.mjs` scripts need Node 18
+or newer.
 
 ## What the page does
 
