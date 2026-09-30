@@ -1109,6 +1109,9 @@ pub fn handle(input: &str) -> String {
     if let Some(bad) = &r.bad_default {
         return err(&format!("unknown default rule {}", bad));
     }
+    if matches!(r.default, Some(Formula::AGen6)) && r.k < 6 {
+        return err("agen6 needs 6 colours (k 6)");
+    }
     if !r.bad_rows.is_empty() {
         return err(&format!("bad table line: {}", r.bad_rows[0]));
     }
@@ -1351,9 +1354,9 @@ mod tests {
         // rule 6 before rule 7 before rule 8
         assert!(ans(6, "4.010101").contains("\"paint\":4,\"target\":5"));
         assert!(ans(6, "4.010100").contains("\"paint\":1,\"target\":3"));
-        // the paper defines no rule for fin, and A_Gen6 needs six colours
+        // the paper defines no rule for fin; A_Gen6 with fewer than six colours is an error
         assert!(ans(6, "2.000000").contains("\"defined\":false"));
-        assert!(ans(5, "0.10000").contains("\"defined\":false"));
+        assert!(ans(5, "0.10000").contains("6 colours"), "A_Gen6 needs six colours: an error, not an undefined row");
     }
 
     fn paper_rule_from_table(k: u8, rows: &[(&str, &str)]) -> Rule {
@@ -1563,6 +1566,16 @@ mod tests {
         // a table without stop stays classic
         let plain = handle("cmd exact\nk 2\ngraph 2 0 0-1\ntable\n0.10 1>0\n0.01 0>stay\nend\n");
         assert!(plain.contains("\"model\":\"classic\""), "{}", plain);
+    }
+
+    #[test]
+    fn agen6_with_too_few_colours_is_an_error_not_a_silent_undefined() {
+        for k in 2..6 {
+            let out = handle(&format!("cmd exact\nk {}\ngraph 3 0 0-1,1-2\ndefault agen6\n", k));
+            assert!(out.contains("\"status\":\"error\"") && out.contains("6 colours"), "k {}: {}", k, out);
+        }
+        let ok = handle("cmd exact\nk 6\ngraph 3 0 0-1,1-2\ndefault agen6\n");
+        assert!(ok.contains("\"status\":\"explores\""), "{}", ok);
     }
 
     #[test]
