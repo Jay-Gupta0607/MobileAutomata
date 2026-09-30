@@ -619,6 +619,8 @@ pub struct Trace {
     /// ended by exploring or at an undefined row)
     pub repeat_at: Option<usize>,
     pub unvisited: u32,
+    /// the vertex the agent terminated on (paper model), `None` if it did not stop
+    pub stopped_at: Option<u8>,
 }
 
 pub enum Outcome {
@@ -654,6 +656,10 @@ fn successors(g: &Graph, p: &Pos, a: Action, terminating: bool) -> Vec<(Option<u
 /// obstruction (the rule explores) or a trapping play (it fails).
 pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     let full = g.full();
+    // classic: over as soon as every vertex is visited.  Paper model: over when the
+    // agent stops; it wins only if it stopped on the start vertex with every vertex visited.
+    let over = |p: &Pos| if rule.terminating { p.term } else { p.vis == full };
+    let won = |p: &Pos| if rule.terminating { p.term && p.cur == g.s && p.vis == full } else { p.vis == full };
     let root = Pos { chi: 0, cur: g.s, vis: 1 << g.s, term: false };
     let mut states = vec![root];
     let mut index: Map<Pos, u32> = Map::default();
@@ -664,7 +670,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     let mut i = 0usize;
     while i < states.len() {
         let p = states[i];
-        if p.vis != full && !p.term {
+        if !over(&p) {
             let row = row_at(g, p.chi, p.cur);
             let act = match rule.action(&row) {
                 Some(a) => a,
@@ -686,7 +692,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
                         let next = if nxt.cur != q.cur || nxt.vis != q.vis { Some(nxt.cur) } else { None };
                         steps.push(Step { cur: q.cur, row: r, act: a, options: options(g, q.chi, q.cur, a.target), next });
                     }
-                    return Outcome::Undefined { row, path: Trace { steps, repeat_at: None, unvisited: full & !p.vis } };
+                    return Outcome::Undefined { row, path: Trace { steps, repeat_at: None, unvisited: full & !p.vis, stopped_at: None } };
                 }
             };
             for (_, q) in successors(g, &p, act, rule.terminating) {
@@ -731,7 +737,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     let mut rank = vec![0u32; n];
     let mut queue: Vec<u32> = Vec::new();
     for p in 0..n {
-        if states[p].vis == full {
+        if won(&states[p]) {
             win[p] = true;
             queue.push(p as u32);
         }
@@ -760,24 +766,28 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     if win[0] {
         let mut steps = Vec::new();
         let mut at = 0u32;
-        while states[at as usize].vis != full {
+        while !over(&states[at as usize]) {
             let p = states[at as usize];
             let act = rule.action(&row_at(g, p.chi, p.cur)).unwrap();
             let (u, j) = successors(g, &p, act, rule.terminating).into_iter().map(|(u, q)| (u, index[&q])).max_by_key(|&(_, j)| rank[j as usize]).unwrap();
             steps.push(step_of(&p, u));
             at = j;
         }
-        return Outcome::Explores { positions: n, trace: Trace { steps, repeat_at: None, unvisited: 0 } };
+        let stopped_at = if rule.terminating { Some(states[at as usize].cur) } else { None };
+        return Outcome::Explores { positions: n, trace: Trace { steps, repeat_at: None, unvisited: 0, stopped_at } };
     }
     let mut steps = Vec::new();
     let mut seen: Map<u32, usize> = Map::default();
     let mut at = 0u32;
     let repeat_at = loop {
         if let Some(&s) = seen.get(&at) {
-            break s;
+            break Some(s);
         }
         seen.insert(at, steps.len());
         let p = states[at as usize];
+        if p.term {
+            break None; // the agent stopped where it should not have
+        }
         let act = rule.action(&row_at(g, p.chi, p.cur)).unwrap();
         let mut choice: Option<(Option<u8>, u32)> = None;
         for (u, q) in successors(g, &p, act, rule.terminating) {
@@ -797,8 +807,10 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
         steps.push(step_of(&p, u));
         at = j;
     };
-    let unvisited = full & !states[at as usize].vis;
-    Outcome::Fails { positions: n, method: "exact game".into(), trace: Trace { steps, repeat_at: Some(repeat_at), unvisited } }
+    let end = states[at as usize];
+    let unvisited = full & !end.vis;
+    let stopped_at = if end.term { Some(end.cur) } else { None };
+    Outcome::Fails { positions: n, method: "exact game".into(), trace: Trace { steps, repeat_at, unvisited, stopped_at } }
 }
 
 fn frontier_distances(g: &Graph, vis: u32) -> Vec<u32> {
@@ -852,13 +864,13 @@ pub fn walk(g: &Graph, rule: &Rule, heuristic: u8, seed: u64, budget: usize) -> 
             return Ok(None);
         }
         if let Some(&s) = seen.get(&p) {
-            return Ok(Some(Trace { steps, repeat_at: Some(s), unvisited: full & !p.vis }));
+            return Ok(Some(Trace { steps, repeat_at: Some(s), unvisited: full & !p.vis, stopped_at: None }));
         }
         seen.insert(p, steps.len());
         let row = row_at(g, p.chi, p.cur);
         let act = match rule.action(&row) {
             Some(a) => a,
-            None => return Err((row, Trace { steps, repeat_at: None, unvisited: full & !p.vis })),
+            None => return Err((row, Trace { steps, repeat_at: None, unvisited: full & !p.vis, stopped_at: None })),
         };
         let sucs = successors(g, &p, act, rule.terminating);
         let opts: Vec<u8> = sucs.iter().filter_map(|(u, _)| *u).collect();
@@ -1298,6 +1310,96 @@ mod tests {
         // the paper defines no rule for fin, and A_Gen6 needs six colours
         assert!(ans(6, "2.000000").contains("\"defined\":false"));
         assert!(ans(5, "0.10000").contains("\"defined\":false"));
+    }
+
+    fn paper_rule_from_table(k: u8, rows: &[(&str, &str)]) -> Rule {
+        let mut table = Map::default();
+        for (r, a) in rows {
+            table.insert(Row::parse(r).unwrap(), Action::parse(a).unwrap());
+        }
+        Rule { k, table, default: None, terminating: true }
+    }
+
+    #[test]
+    fn exact_game_explores_with_agen6_from_every_start() {
+        let rule = Rule { k: 6, table: Map::default(), default: Some(Formula::AGen6), terminating: true };
+        for (name, n, edges) in [("path", 3u8, "0-1,1-2"), ("triangle", 3, "0-1,1-2,0-2"), ("tree", 4, "0-1,0-2,1-3")] {
+            for start in 0..n {
+                let g = Graph::parse(&format!("{} {} {}", n, start, edges)).unwrap();
+                match exact_game(&g, &rule, 1_000_000) {
+                    Outcome::Explores { trace, .. } => {
+                        assert_eq!(trace.stopped_at, Some(start), "{} from {} must stop on the start", name, start);
+                        assert_eq!(trace.unvisited, 0);
+                        assert_eq!(trace.steps.last().unwrap().act.target, STOP);
+                    }
+                    _ => panic!("A_Gen6 must explore the {} from vertex {}", name, start),
+                }
+            }
+        }
+        // the path from its end vertex has no choice for the adversary: 17 actions, as in the hand trace
+        let g = Graph::parse("3 0 0-1,1-2").unwrap();
+        match exact_game(&g, &rule, 1_000_000) {
+            Outcome::Explores { trace, .. } => assert_eq!(trace.steps.len(), 17),
+            _ => panic!(),
+        }
+    }
+
+    #[test]
+    fn paper_model_wants_a_stop_where_the_classic_game_does_not() {
+        // sigma* visits every vertex of a short path but never stops
+        let g = Graph::parse("4 0 0-1,1-2,2-3").unwrap();
+        let mut r = rule(5, "sigma");
+        assert!(matches!(exact_game(&g, &r, 100_000), Outcome::Explores { .. }));
+        r.terminating = true;
+        match exact_game(&g, &r, 100_000) {
+            Outcome::Fails { trace, .. } => {
+                assert!(trace.repeat_at.is_some(), "it circles forever");
+                assert_eq!(trace.stopped_at, None);
+            }
+            _ => panic!("a rule that never stops cannot explore in the paper model"),
+        }
+    }
+
+    #[test]
+    fn a_stop_off_the_start_vertex_is_a_failure() {
+        // two vertices: the agent walks to vertex 1, visits everything, and stops there
+        let g = Graph::parse("2 0 0-1").unwrap();
+        let r = paper_rule_from_table(2, &[("0.10", "1>0"), ("0.01", "0>stop")]);
+        match exact_game(&g, &r, 1000) {
+            Outcome::Fails { trace, .. } => {
+                assert_eq!(trace.stopped_at, Some(1));
+                assert_eq!(trace.unvisited, 0, "every vertex was visited, but it stopped in the wrong place");
+                assert_eq!(trace.repeat_at, None);
+            }
+            _ => panic!("stopping away from the start must fail"),
+        }
+    }
+
+    #[test]
+    fn a_stop_before_every_vertex_is_visited_is_a_failure() {
+        let g = Graph::parse("2 0 0-1").unwrap();
+        let r = paper_rule_from_table(2, &[("0.10", "1>stop")]);
+        match exact_game(&g, &r, 1000) {
+            Outcome::Fails { trace, .. } => {
+                assert_eq!(trace.stopped_at, Some(0));
+                assert_eq!(trace.unvisited, 1 << 1);
+            }
+            _ => panic!("stopping early must fail"),
+        }
+    }
+
+    #[test]
+    fn a_rule_that_returns_and_stops_on_the_start_explores() {
+        // vertex 0 -> 1 (paints 0 white->1), vertex 1 sends the agent back, vertex 0 stops
+        let g = Graph::parse("2 0 0-1").unwrap();
+        let r = paper_rule_from_table(2, &[("0.10", "1>0"), ("0.01", "0>1"), ("1.10", "1>stop")]);
+        match exact_game(&g, &r, 1000) {
+            Outcome::Explores { trace, .. } => {
+                assert_eq!(trace.stopped_at, Some(0));
+                assert_eq!(trace.steps.len(), 3);
+            }
+            _ => panic!("visiting everything and stopping on the start must explore"),
+        }
     }
 
     #[test]
