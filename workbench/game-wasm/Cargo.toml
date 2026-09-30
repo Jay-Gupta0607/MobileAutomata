@@ -2,6 +2,7 @@
 name = "game-wasm"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.78"  # the committed Cargo.lock is format version 4
 description = "The colour-exploration game for the browser: rules, adversary, exact game.  No dependencies; plain C-ABI exports for wasm32-unknown-unknown."
 
 [lib]
