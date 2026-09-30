@@ -92,8 +92,20 @@ fn the_graph_can_come_from_a_file_or_a_preset() {
     let g = Temp::new("graph.txt", "4 0\n0-1,0-2,\n1-3\n");
     let o = run(&["exact", "--graph-file", g.path(), "--rule", "agen6"]);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
+    // sigma* explores Sketch I, so every walk explores: unrefuted, after 3 deterministic and 4 random walks
     let p = run(&["walks", "--preset", "sketch1", "--rule", "sigma", "--k", "5", "--walks", "4"]);
-    assert!(matches!(code(&p), 0 | 1 | 4), "{}", stdout(&p));
+    assert_eq!(code(&p), 4, "{}", stdout(&p));
+    assert!(stdout(&p).contains("\"status\":\"unrefuted\"") && stdout(&p).contains("\"walks\":7"), "{}", stdout(&p));
+}
+
+#[test]
+fn the_sketch1_preset_is_the_graph_of_the_page() {
+    // the tool's copy of the preset must not drift from the one in the page
+    let html = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("site").join("index.html")).unwrap();
+    let after = html.split("sketch1: { text: '").nth(1).expect("the page defines the sketch1 preset");
+    let page_text = after.split('\'').next().unwrap();
+    let o = run(&["exact", "--preset", "sketch1", "--request"]);
+    assert!(stdout(&o).lines().any(|l| l == format!("graph {}", page_text)), "{} vs the page: {}", stdout(&o), page_text);
 }
 
 #[test]
