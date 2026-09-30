@@ -70,6 +70,9 @@ rule that can `stop` (a table row whose target is `stop`) is played the same way
 * the Analysis tab says what failed, from the engine's own reason (never stops, stopped early, stopped away from the
   start) with the same three indicators, and a found execution can be replayed step by step;
 * the rules table and the define-row prompt offer `stop (paper model)` next to `stay`.
+* a hint next to the colours picker says how many colours the rule in use needs: A_Gen6 exactly six (shown in a
+  warning colour, with the current number, when fewer are chosen), flipsweep4 and 4b, flipsweep5 and 5d, eat3 and chase3
+  at least 4, 5 and 3; rules that work with any number have no hint.  The numbers are checked against the engine.
 
 The classic game keeps its own behaviour and wording.  `game-wasm/testdata/check_page_logic.mjs` compiles the script of
 both pages and holds the paper-model logic to the engine (for every paper-model fixture the page's verdict must equal
