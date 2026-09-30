@@ -570,6 +570,10 @@ pub struct Rule {
     pub table: Map<Row, Action>,
     /// answers rows the table does not list; `None` leaves them undefined
     pub default: Option<Formula>,
+    /// the paper's model (Takahashi et al., Section 2): `stop` ends the run, and
+    /// exploring means every vertex visited and the agent stopped on the start
+    /// vertex.  Off: the classic game, won as soon as every vertex is visited.
+    pub terminating: bool,
 }
 
 pub enum Answer {
@@ -954,7 +958,9 @@ fn err(msg: &str) -> String {
 /// Lines of `key value`.  Keys: `cmd` (`step`, `exact`, `walks`, `answer`),
 /// `k`, `graph` (`n s u-v,...`), `default` (a formula name), `cap`, `walks`,
 /// `budget`, `colours` (space-separated, for `step`), `cur`, `vis`
-/// (space-separated visited vertices), `row` (for `answer`); the block
+/// (space-separated visited vertices), `row` (for `answer`), `model`
+/// (`classic` or `paper`; default `classic`, or `paper` when the default rule
+/// is `agen6`); the block
 /// between a line `table` and a line `end` lists `row action` pairs.
 struct Request {
     cmd: String,
@@ -971,10 +977,11 @@ struct Request {
     cur: Option<u8>,
     vis: Vec<u8>,
     row: Option<String>,
+    model: String,
 }
 
 fn parse_request(input: &str) -> Request {
-    let mut r = Request { cmd: String::new(), k: 5, graph: None, table: Map::default(), bad_rows: Vec::new(), default: None, bad_default: None, cap: 1_000_000, walks: 64, budget: 200_000, colours: Vec::new(), cur: None, vis: Vec::new(), row: None };
+    let mut r = Request { cmd: String::new(), k: 5, graph: None, table: Map::default(), bad_rows: Vec::new(), default: None, bad_default: None, cap: 1_000_000, walks: 64, budget: 200_000, colours: Vec::new(), cur: None, vis: Vec::new(), row: None, model: String::new() };
     let mut in_table = false;
     for line in input.lines() {
         let line = line.trim();
@@ -1020,11 +1027,22 @@ fn parse_request(input: &str) -> Request {
             "cur" => r.cur = val.parse().ok(),
             "vis" => r.vis = val.split_whitespace().filter_map(|x| x.parse().ok()).collect(),
             "row" => r.row = Some(val.to_string()),
+            "model" => r.model = val.to_string(),
             "table" => in_table = true,
             _ => {}
         }
     }
     r
+}
+
+/// Whether the request runs the paper's model (see `Rule::terminating`).
+fn resolve_model(model: &str, default: &Option<Formula>) -> Result<bool, String> {
+    match model {
+        "paper" => Ok(true),
+        "classic" => Ok(false),
+        "" => Ok(matches!(default, Some(Formula::AGen6))),
+        other => Err(format!("unknown model {} (classic or paper)", other)),
+    }
 }
 
 pub fn handle(input: &str) -> String {
@@ -1043,7 +1061,11 @@ pub fn handle(input: &str) -> String {
             return err(&format!("table entry {} {} uses a colour outside 0..{}", row.text(r.k), act.text(), r.k - 1));
         }
     }
-    let rule = Rule { k: r.k, table: r.table, default: r.default };
+    let terminating = match resolve_model(&r.model, &r.default) {
+        Ok(t) => t,
+        Err(e) => return err(&e),
+    };
+    let rule = Rule { k: r.k, table: r.table, default: r.default, terminating };
     if r.cmd == "answer" {
         // the rule's answer on one row, for the rule editor
         let Some(text) = r.row.as_deref().and_then(Row::parse) else { return err("row: expected own.bag") };
@@ -1137,7 +1159,7 @@ mod tests {
     const SKETCH1: &str = "17 0 0-1,1-2,0-2,0-3,2-3,0-4,4-5,3-6,4-6,5-6,5-7,6-8,7-8,5-9,9-14,9-15,9-10,10-16,5-10,9-11,10-11,5-11,7-11,11-12,11-13,12-13";
 
     fn rule(k: u8, f: &str) -> Rule {
-        Rule { k, table: Map::default(), default: Formula::parse(f) }
+        Rule { k, table: Map::default(), default: Formula::parse(f), terminating: false }
     }
 
     #[test]
@@ -1270,6 +1292,27 @@ mod tests {
         // the paper defines no rule for fin, and A_Gen6 needs six colours
         assert!(ans(6, "2.000000").contains("\"defined\":false"));
         assert!(ans(5, "0.10000").contains("\"defined\":false"));
+    }
+
+    #[test]
+    fn model_defaults_to_classic_and_agen6_implies_paper() {
+        assert_eq!(resolve_model("", &Formula::parse("sigma")), Ok(false));
+        assert_eq!(resolve_model("", &None), Ok(false));
+        assert_eq!(resolve_model("", &Formula::parse("agen6")), Ok(true));
+        assert_eq!(resolve_model("paper", &None), Ok(true));
+        assert_eq!(resolve_model("classic", &Formula::parse("agen6")), Ok(false));
+        assert!(resolve_model("nonsense", &None).is_err());
+        assert!(handle("cmd answer
+k 6
+row 0.100000
+model nonsense
+").contains("unknown model"));
+        assert!(!handle("cmd answer
+k 6
+row 0.100000
+model paper
+default agen6
+").contains("error"));
     }
 
     #[test]
