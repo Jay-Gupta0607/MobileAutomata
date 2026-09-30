@@ -1,0 +1,279 @@
+//! Command-line front end of the colour-exploration engine.
+//!
+//! A thin wrapper: it builds the same request text the browser page sends and calls
+//! `game_wasm::handle`, so a native run and a run in the WebAssembly build give the same
+//! answer for the same request.  No dependencies.
+
+use std::process::ExitCode;
+
+const USAGE: &str = "\
+usage: explore <command> --graph \"n s u-v,u-v,...\" [options]
+
+commands
+  exact     search every adversarial execution (the exact game)
+  walks     try deterministic and random adversary walks (a failure is proof, success is not)
+  play      one execution under an adversary that prefers the vertices given by --prefer
+  answer    the rule's action for one row (--row own.bag)
+
+graph
+  --graph TEXT        `n s u-v,u-v,...`: n vertices, start s, edges (0-based)
+  --graph-file FILE   the same text, read from a file
+  --preset NAME       sketch1
+
+rule
+  --rule NAME         default rule: sigma, agen6, chasewhite, chase3, eat3, flipsweep4, flipsweep4b,
+                      flipsweep5, flipsweep5d, sweep(c,t,p), none  (default: none)
+  --table FILE        rows `own.bag paint>target`, one per line; # starts a comment; target is a
+                      colour, stay or stop.  Rows in the table win over --rule
+  --k N               number of colours, 2 to 6 (default 5; agen6 needs 6)
+  --model MODEL       classic or paper (default: paper when the rule can stop, else classic)
+
+search
+  --cap N             exact: most positions to enumerate (default 1000000)
+  --walks N           walks: number of random walks after the three deterministic ones (default 64)
+  --budget N          walks and play: most steps (default 200000)
+  --prefer LIST       play: adversary preference order, e.g. \"1 2 3 0\" (a vertex not listed comes last)
+  --row own.bag       answer: the row to look up, e.g. 3.100100
+
+output
+  --summary           one line instead of the JSON
+  --request           print the request that would be sent and stop
+
+exit status
+  0 explores    1 fails    2 undefined row    3 overflow (raise --cap)
+  4 unrefuted (no failure found by the walks: not a proof)    5 unfinished (budget ran out)
+  64 usage error or an error from the engine
+";
+
+const SHORT: &str = "usage: explore <exact|walks|play|answer> --graph \"n s u-v,u-v,...\" [options]   (explore --help lists the options)";
+
+/// `n s edges`, with the edge pieces joined: the engine reads only the third whitespace-separated
+/// token as the edge list and would silently drop the rest of `0-1, 1-2, 0-2`.
+fn normalise_graph(text: &str) -> Result<String, String> {
+    let mut it = text.split_whitespace();
+    let n = it.next().ok_or("the graph is empty (expected `n s u-v,u-v,...`)")?;
+    let s = it.next().ok_or("the graph needs a start vertex (expected `n s u-v,u-v,...`)")?;
+    let edges: String = it.collect::<Vec<_>>().concat();
+    Ok(if edges.is_empty() { format!("{} {}", n, s) } else { format!("{} {} {}", n, s, edges) })
+}
+
+/// The preset graphs (same texts as the browser page).
+fn preset(name: &str) -> Option<&'static str> {
+    match name {
+        "sketch1" => Some("17 0 0-1,1-2,0-2,0-3,2-3,0-4,4-5,3-6,4-6,5-6,5-7,6-8,7-8,5-9,9-14,9-15,9-10,10-16,5-10,9-11,10-11,5-11,7-11,11-12,11-13,12-13"),
+        _ => None,
+    }
+}
+
+struct Args {
+    command: String,
+    graph: Option<String>,
+    rule: Option<String>,
+    table: Option<String>,
+    k: Option<String>,
+    model: Option<String>,
+    cap: Option<String>,
+    walks: Option<String>,
+    budget: Option<String>,
+    prefer: Option<String>,
+    row: Option<String>,
+    summary: bool,
+    request: bool,
+}
+
+fn parse_args(argv: &[String]) -> Result<Args, String> {
+    let mut a = Args { command: String::new(), graph: None, rule: None, table: None, k: None, model: None, cap: None, walks: None, budget: None, prefer: None, row: None, summary: false, request: false };
+    let mut i = 0;
+    while i < argv.len() {
+        let arg = argv[i].as_str();
+        let mut value = |name: &str| -> Result<String, String> {
+            i += 1;
+            argv.get(i).cloned().ok_or_else(|| format!("{} needs a value", name))
+        };
+        match arg {
+            "--graph" => a.graph = Some(normalise_graph(&value(arg)?)?),
+            "--graph-file" => {
+                let path = value(arg)?;
+                let text = std::fs::read_to_string(&path).map_err(|e| format!("cannot read {}: {}", path, e))?;
+                a.graph = Some(normalise_graph(&text)?);
+            }
+            "--preset" => {
+                let name = value(arg)?;
+                a.graph = Some(preset(&name).ok_or_else(|| format!("unknown preset {} (sketch1)", name))?.to_string());
+            }
+            "--rule" => a.rule = Some(value(arg)?),
+            "--table" => {
+                let path = value(arg)?;
+                let text = std::fs::read_to_string(&path).map_err(|e| format!("cannot read {}: {}", path, e))?;
+                a.table = Some(text);
+            }
+            "--k" => a.k = Some(value(arg)?),
+            "--model" => a.model = Some(value(arg)?),
+            "--cap" => a.cap = Some(value(arg)?),
+            "--walks" => a.walks = Some(value(arg)?),
+            "--budget" => a.budget = Some(value(arg)?),
+            "--prefer" => a.prefer = Some(value(arg)?),
+            "--row" => a.row = Some(value(arg)?),
+            "--summary" => a.summary = true,
+            "--request" => a.request = true,
+            "-h" | "--help" => return Err(String::new()),
+            _ if arg.starts_with("--") => return Err(format!("unknown option {}", arg)),
+            _ if a.command.is_empty() => a.command = arg.to_string(),
+            _ => return Err(format!("unexpected argument {}", arg)),
+        }
+        i += 1;
+    }
+    match a.command.as_str() {
+        "exact" | "walks" | "play" | "answer" => Ok(a),
+        "" => Err("no command given".into()),
+        other => Err(format!("unknown command {} (exact, walks, play, answer)", other)),
+    }
+}
+
+/// A number option must be digits only; anything else would silently fall back to the engine's default.
+fn number(name: &str, v: &str) -> Result<String, String> {
+    if !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit()) {
+        Ok(v.to_string())
+    } else {
+        Err(format!("{} must be a whole number, got {:?}", name, v))
+    }
+}
+
+/// The request text of the engine's line protocol.
+fn build_request(a: &Args) -> Result<String, String> {
+    let mut r = format!("cmd {}\n", a.command);
+    if let Some(k) = &a.k {
+        r += &format!("k {}\n", number("--k", k)?);
+    } else if a.rule.as_deref() == Some("agen6") {
+        r += "k 6\n";
+    }
+    if a.command != "answer" {
+        let g = a.graph.as_deref().ok_or("--graph (or --graph-file, --preset) is required")?;
+        r += &format!("graph {}\n", g);
+    }
+    if let Some(rule) = &a.rule {
+        r += &format!("default {}\n", rule);
+    }
+    if let Some(m) = &a.model {
+        r += &format!("model {}\n", m);
+    }
+    if let Some(v) = &a.cap {
+        r += &format!("cap {}\n", number("--cap", v)?);
+    }
+    if let Some(v) = &a.walks {
+        r += &format!("walks {}\n", number("--walks", v)?);
+    }
+    if let Some(v) = &a.budget {
+        r += &format!("budget {}\n", number("--budget", v)?);
+    }
+    if let Some(p) = &a.prefer {
+        r += &format!("prefer {}\n", p.split(|c: char| c == ',' || c.is_whitespace()).filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" "));
+    }
+    if a.command == "answer" {
+        r += &format!("row {}\n", a.row.as_deref().ok_or("answer needs --row own.bag")?);
+    }
+    if let Some(t) = &a.table {
+        r += "table\n";
+        for line in t.lines() {
+            let line = line.split('#').next().unwrap_or("").trim();
+            if !line.is_empty() {
+                r += line;
+                r.push('\n');
+            }
+        }
+        r += "end\n";
+    }
+    Ok(r)
+}
+
+/// The string value of `"key":"value"` in the engine's flat JSON (first occurrence).
+fn json_str<'a>(json: &'a str, key: &str) -> Option<&'a str> {
+    let pat = format!("\"{}\":\"", key);
+    let start = json.find(&pat)? + pat.len();
+    Some(&json[start..start + json[start..].find('"')?])
+}
+
+fn json_raw<'a>(json: &'a str, key: &str) -> Option<&'a str> {
+    let pat = format!("\"{}\":", key);
+    let start = json.find(&pat)? + pat.len();
+    let rest = &json[start..];
+    Some(&rest[..rest.find(|c| c == ',' || c == '}').unwrap_or(rest.len())])
+}
+
+fn exit_code(status: &str) -> u8 {
+    match status {
+        "explores" | "ok" => 0,
+        "fails" => 1,
+        "undefined" => 2,
+        "overflow" => 3,
+        "unrefuted" => 4,
+        "unfinished" => 5,
+        _ => 64,
+    }
+}
+
+fn summary(json: &str) -> String {
+    let status = json_str(json, "status").unwrap_or("?");
+    if status == "error" {
+        return format!("error: {}", json_str(json, "message").unwrap_or("?"));
+    }
+    let mut s = status.to_string();
+    if let Some(m) = json_str(json, "model") {
+        s += &format!(" ({} model)", m);
+    }
+    if let Some(reason) = json_str(json, "reason") {
+        s += &format!(", {}", reason.replace('_', " "));
+    }
+    if let Some(v) = json_raw(json, "positions") {
+        if v != "0" {
+            s += &format!(", {} positions", v);
+        }
+    }
+    if let Some(v) = json_raw(json, "walks") {
+        s += &format!(", {} walks", v);
+    }
+    if let Some(v) = json_raw(json, "stopped_at") {
+        if v != "null" {
+            s += &format!(", stopped on vertex {}", v);
+        }
+    }
+    if let Some(row) = json_str(json, "row") {
+        if status == "undefined" {
+            s += &format!(", no action for row {}", row);
+        }
+    }
+    s
+}
+
+fn main() -> ExitCode {
+    let argv: Vec<String> = std::env::args().skip(1).collect();
+    let args = match parse_args(&argv) {
+        Ok(a) => a,
+        Err(msg) => {
+            if msg.is_empty() {
+                print!("{}", USAGE);
+                return ExitCode::SUCCESS;
+            }
+            eprintln!("explore: {}\n{}", msg, SHORT);
+            return ExitCode::from(64);
+        }
+    };
+    let request = match build_request(&args) {
+        Ok(r) => r,
+        Err(msg) => {
+            eprintln!("explore: {}\n{}", msg, SHORT);
+            return ExitCode::from(64);
+        }
+    };
+    if args.request {
+        print!("{}", request);
+        return ExitCode::SUCCESS;
+    }
+    let json = game_wasm::handle(&request);
+    if args.summary {
+        println!("{}", summary(&json));
+    } else {
+        println!("{}", json);
+    }
+    ExitCode::from(exit_code(json_str(&json, "status").unwrap_or("error")))
+}

@@ -52,6 +52,31 @@ the engine (base64) so it opens from a `file://` URL.  `site/index.html` +
   three deterministic and N random adversary walks first, a cheap way to find
   a failure, never a proof of success.
 
+## Command line (`explore`)
+
+A native tool over the same engine, for scripts and for checking an algorithm without the page.  It builds
+the request of the protocol below and calls the same `handle` function the WebAssembly build exports, so a
+native run and a browser run answer identically.  From `game-wasm/`:
+
+    cargo run --bin explore -- exact --graph "4 0 0-1,0-2,1-3" --rule agen6 --summary
+    cargo run --bin explore -- play --graph "4 0 0-1,0-2,1-3" --rule agen6 --prefer "1 2 3 0"
+    cargo run --bin explore -- exact --preset sketch1 --rule sigma --cap 3000000 --summary
+    cargo run --bin explore -- walks --graph "3 0 0-1,1-2" --table rules.txt --k 3
+    cargo run --bin explore -- answer --rule agen6 --row 4.001000
+    cargo run --bin explore -- --help
+
+Commands: `exact` (every adversary), `walks`, `play` (one adversary, named by `--prefer`), `answer` (the
+action for one row).  The graph comes from `--graph "n s u-v,..."`, `--graph-file FILE` or `--preset sketch1`
+(edge pieces may be separated by spaces or line breaks).  The rule is `--rule NAME` (a formula such as `sigma` or
+`agen6`), `--table FILE` (rows `own.bag paint>target`, `#` comments), or both (table rows win).  Also `--k`,
+`--model classic|paper`, `--cap`, `--walks`, `--budget`.  The JSON of the protocol is printed; `--summary`
+prints one line, `--request` prints the request instead of running it.
+
+Exit status: 0 explores, 1 fails, 2 undefined row, 3 overflow (raise `--cap`), 4 unrefuted (the walks found no
+failure: not a proof), 5 unfinished (`play` ran out of budget), 64 usage error or an error from the engine.
+`cargo test` in `game-wasm/` also runs the tool's tests (`tests/cli.rs`).  `build.sh` builds only the library
+for WebAssembly.
+
 ## Protocol (for other front ends)
 
 `run` takes UTF-8 text lines `key value`: `cmd step|exact|walks|play|answer`,
