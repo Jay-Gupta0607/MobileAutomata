@@ -1,0 +1,4 @@
+cmd exact
+k 6
+graph 3 1 0-1,1-2,0-2
+default agen6

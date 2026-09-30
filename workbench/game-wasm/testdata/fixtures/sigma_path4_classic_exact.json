@@ -1,0 +1,1 @@
+{"status":"explores","model":"classic","positions":4,"trace":{"repeat_at":null,"unvisited":[],"stopped_at":null,"steps":[{"cur":0,"row":"0.10000","paint":1,"target":0,"options":[1],"next":1},{"cur":1,"row":"0.11000","paint":1,"target":0,"options":[2],"next":2},{"cur":2,"row":"0.11000","paint":1,"target":0,"options":[3],"next":3}]}}

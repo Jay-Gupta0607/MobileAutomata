@@ -1,0 +1,1 @@
+{"status":"fails","model":"paper","positions":2,"method":"exact game","indicators":{"visited_all":false,"stopped":true,"stopped_at_start":true},"reason":"stopped_early","trace":{"repeat_at":null,"unvisited":[1],"stopped_at":0,"steps":[{"cur":0,"row":"0.10","paint":1,"target":-2,"options":[],"next":null}]}}

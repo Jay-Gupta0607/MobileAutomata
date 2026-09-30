@@ -1,0 +1,2 @@
+# fixtures and their expected answers are compared byte for byte, natively and in WebAssembly
+* text eol=lf
