@@ -218,6 +218,8 @@ pub struct Pos {
     pub chi: u128,
     pub cur: u8,
     pub vis: u32,
+    /// the agent has stopped (paper model): no move follows
+    pub term: bool,
 }
 
 pub fn colour(chi: u128, v: u8) -> u8 {
@@ -633,13 +635,17 @@ pub enum Outcome {
     Unrefuted { walks: usize },
 }
 
-fn successors(g: &Graph, p: &Pos, a: Action) -> Vec<(Option<u8>, Pos)> {
+fn successors(g: &Graph, p: &Pos, a: Action, terminating: bool) -> Vec<(Option<u8>, Pos)> {
     let chi = paint(p.chi, p.cur, a.paint);
+    if terminating && a.target == STOP {
+        // the agent paints its vertex and terminates there
+        return vec![(None, Pos { chi, cur: p.cur, vis: p.vis, term: true })];
+    }
     let opts = options(g, p.chi, p.cur, a.target);
     if opts.is_empty() {
-        vec![(None, Pos { chi, cur: p.cur, vis: p.vis })]
+        vec![(None, Pos { chi, cur: p.cur, vis: p.vis, term: false })]
     } else {
-        opts.into_iter().map(|u| (Some(u), Pos { chi, cur: u, vis: p.vis | (1 << u) })).collect()
+        opts.into_iter().map(|u| (Some(u), Pos { chi, cur: u, vis: p.vis | (1 << u), term: false })).collect()
     }
 }
 
@@ -648,7 +654,7 @@ fn successors(g: &Graph, p: &Pos, a: Action) -> Vec<(Option<u8>, Pos)> {
 /// obstruction (the rule explores) or a trapping play (it fails).
 pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     let full = g.full();
-    let root = Pos { chi: 0, cur: g.s, vis: 1 << g.s };
+    let root = Pos { chi: 0, cur: g.s, vis: 1 << g.s, term: false };
     let mut states = vec![root];
     let mut index: Map<Pos, u32> = Map::default();
     index.insert(root, 0);
@@ -658,7 +664,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
     let mut i = 0usize;
     while i < states.len() {
         let p = states[i];
-        if p.vis != full {
+        if p.vis != full && !p.term {
             let row = row_at(g, p.chi, p.cur);
             let act = match rule.action(&row) {
                 Some(a) => a,
@@ -683,7 +689,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
                     return Outcome::Undefined { row, path: Trace { steps, repeat_at: None, unvisited: full & !p.vis } };
                 }
             };
-            for (_, q) in successors(g, &p, act) {
+            for (_, q) in successors(g, &p, act, rule.terminating) {
                 let j = match index.get(&q) {
                     Some(&j) => j,
                     None => {
@@ -757,7 +763,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
         while states[at as usize].vis != full {
             let p = states[at as usize];
             let act = rule.action(&row_at(g, p.chi, p.cur)).unwrap();
-            let (u, j) = successors(g, &p, act).into_iter().map(|(u, q)| (u, index[&q])).max_by_key(|&(_, j)| rank[j as usize]).unwrap();
+            let (u, j) = successors(g, &p, act, rule.terminating).into_iter().map(|(u, q)| (u, index[&q])).max_by_key(|&(_, j)| rank[j as usize]).unwrap();
             steps.push(step_of(&p, u));
             at = j;
         }
@@ -774,7 +780,7 @@ pub fn exact_game(g: &Graph, rule: &Rule, cap: usize) -> Outcome {
         let p = states[at as usize];
         let act = rule.action(&row_at(g, p.chi, p.cur)).unwrap();
         let mut choice: Option<(Option<u8>, u32)> = None;
-        for (u, q) in successors(g, &p, act) {
+        for (u, q) in successors(g, &p, act, rule.terminating) {
             let j = index[&q];
             if win[j as usize] {
                 continue;
@@ -837,12 +843,12 @@ pub fn auto_choice(g: &Graph, vis: u32, opts: &[u8]) -> Option<u8> {
 /// path that reached it.
 pub fn walk(g: &Graph, rule: &Rule, heuristic: u8, seed: u64, budget: usize) -> Result<Option<Trace>, (Row, Trace)> {
     let full = g.full();
-    let mut p = Pos { chi: 0, cur: g.s, vis: 1 << g.s };
+    let mut p = Pos { chi: 0, cur: g.s, vis: 1 << g.s, term: false };
     let mut seen: Map<Pos, usize> = Map::default();
     let mut steps: Vec<Step> = Vec::new();
     let mut rng = seed.max(1);
     while steps.len() < budget {
-        if p.vis == full {
+        if p.term || p.vis == full {
             return Ok(None);
         }
         if let Some(&s) = seen.get(&p) {
@@ -854,7 +860,7 @@ pub fn walk(g: &Graph, rule: &Rule, heuristic: u8, seed: u64, budget: usize) -> 
             Some(a) => a,
             None => return Err((row, Trace { steps, repeat_at: None, unvisited: full & !p.vis })),
         };
-        let sucs = successors(g, &p, act);
+        let sucs = successors(g, &p, act, rule.terminating);
         let opts: Vec<u8> = sucs.iter().filter_map(|(u, _)| *u).collect();
         let pick = if sucs.len() == 1 {
             0
@@ -1292,6 +1298,24 @@ mod tests {
         // the paper defines no rule for fin, and A_Gen6 needs six colours
         assert!(ans(6, "2.000000").contains("\"defined\":false"));
         assert!(ans(5, "0.10000").contains("\"defined\":false"));
+    }
+
+    #[test]
+    fn stop_makes_a_terminal_position_only_in_the_paper_model() {
+        let g = Graph::parse("2 0 0-1").unwrap();
+        let p = Pos { chi: 0, cur: 0, vis: 1, term: false };
+        let stop = Action { paint: 2, target: STOP };
+        let paper = successors(&g, &p, stop, true);
+        assert_eq!(paper.len(), 1);
+        let (moved, q) = paper[0];
+        assert_eq!(moved, None);
+        assert!(q.term && q.cur == 0 && q.vis == 1);
+        assert_eq!(colour(q.chi, 0), 2, "the agent paints before it stops");
+        // classic: stop still means no move, and the agent goes on
+        assert!(!successors(&g, &p, stop, false)[0].1.term);
+        // a colour target with no neighbour of that colour stays put in both models
+        let absent = Action { paint: 1, target: 3 };
+        assert!(!successors(&g, &p, absent, true)[0].1.term);
     }
 
     #[test]
