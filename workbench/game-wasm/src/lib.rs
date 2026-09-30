@@ -652,6 +652,8 @@ pub enum Outcome {
     Overflow { positions: usize },
     /// walks only: every walk explored
     Unrefuted { walks: usize },
+    /// play only: the step budget ran out before the play was decided
+    Unfinished { trace: Trace },
 }
 
 fn successors(g: &Graph, p: &Pos, a: Action, terminating: bool) -> Vec<(Option<u8>, Pos)> {
@@ -867,57 +869,93 @@ pub fn auto_choice(g: &Graph, vis: u32, opts: &[u8]) -> Option<u8> {
 /// seeded random visited target.  `Err` carries an undefined row and the
 /// path that reached it.
 pub fn walk(g: &Graph, rule: &Rule, heuristic: u8, seed: u64, budget: usize) -> Result<Option<Trace>, (Row, Trace)> {
+    let mut rng = seed.max(1);
+    let (end, trace) = play_with(g, rule, budget, |g, p, sucs| {
+        if sucs.len() == 1 {
+            return 0;
+        }
+        let visited: Vec<usize> = (0..sucs.len()).filter(|&i| sucs[i].1.vis == p.vis).collect();
+        let pool: Vec<usize> = if visited.is_empty() { (0..sucs.len()).collect() } else { visited };
+        match heuristic {
+            0 => pool[0],
+            1 => {
+                let d = frontier_distances(g, p.vis);
+                *pool.iter().max_by_key(|&&i| d[sucs[i].1.cur as usize]).unwrap()
+            }
+            2 => *pool.last().unwrap(),
+            _ => {
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                pool[(rng % pool.len() as u64) as usize]
+            }
+        }
+    });
+    match end {
+        PlayEnd::Won | PlayEnd::Budget => Ok(None),
+        PlayEnd::Lost => Ok(Some(trace)),
+        PlayEnd::Undefined(row) => Err((row, trace)),
+    }
+}
+
+/// How a single play ended.
+enum PlayEnd {
+    /// the agent won (see `Rule::won`)
+    Won,
+    /// it stopped in the wrong place, or the position repeated
+    Lost,
+    /// the rule has no action for this row
+    Undefined(Row),
+    /// the step budget ran out with the play undecided
+    Budget,
+}
+
+/// One execution of `rule` on `g`: `choose` picks among the adversary's options (the successors,
+/// more than one only when several neighbours carry the target colour) and returns an index.
+/// The trace holds every step taken, whatever the end.
+fn play_with(g: &Graph, rule: &Rule, budget: usize, mut choose: impl FnMut(&Graph, &Pos, &[(Option<u8>, Pos)]) -> usize) -> (PlayEnd, Trace) {
     let full = g.full();
     let mut p = Pos { chi: 0, cur: g.s, vis: 1 << g.s, term: false };
     let mut seen: Map<Pos, usize> = Map::default();
     let mut steps: Vec<Step> = Vec::new();
-    let mut rng = seed.max(1);
     loop {
+        let trace = |steps: Vec<Step>, repeat_at: Option<usize>, stopped: bool| Trace { steps, repeat_at, unvisited: full & !p.vis, stopped_at: if stopped { Some(p.cur) } else { None } };
         if rule.over(g, &p) {
-            if rule.won(g, &p) {
-                return Ok(None);
-            }
-            // over but not won only happens in the paper model: the agent stopped in the wrong place
-            return Ok(Some(Trace { steps, repeat_at: None, unvisited: full & !p.vis, stopped_at: Some(p.cur) }));
+            let end = if rule.won(g, &p) { PlayEnd::Won } else { PlayEnd::Lost };
+            // over only happens in the paper model, by a stop
+            return (end, trace(steps, None, p.term));
         }
-        // out of budget: decided only after the last position above was looked at
+        // out of budget: decided only after the position above was looked at
         if steps.len() >= budget {
-            return Ok(None);
+            return (PlayEnd::Budget, trace(steps, None, false));
         }
         if let Some(&s) = seen.get(&p) {
-            return Ok(Some(Trace { steps, repeat_at: Some(s), unvisited: full & !p.vis, stopped_at: None }));
+            return (PlayEnd::Lost, trace(steps, Some(s), false));
         }
         seen.insert(p, steps.len());
         let row = row_at(g, p.chi, p.cur);
         let act = match rule.action(&row) {
             Some(a) => a,
-            None => return Err((row, Trace { steps, repeat_at: None, unvisited: full & !p.vis, stopped_at: None })),
+            None => return (PlayEnd::Undefined(row), trace(steps, None, false)),
         };
         let sucs = successors(g, &p, act, rule.terminating);
         let opts: Vec<u8> = sucs.iter().filter_map(|(u, _)| *u).collect();
-        let pick = if sucs.len() == 1 {
-            0
-        } else {
-            let visited: Vec<usize> = (0..sucs.len()).filter(|&i| sucs[i].1.vis == p.vis).collect();
-            let pool: Vec<usize> = if visited.is_empty() { (0..sucs.len()).collect() } else { visited };
-            match heuristic {
-                0 => pool[0],
-                1 => {
-                    let d = frontier_distances(g, p.vis);
-                    *pool.iter().max_by_key(|&&i| d[sucs[i].1.cur as usize]).unwrap()
-                }
-                2 => *pool.last().unwrap(),
-                _ => {
-                    rng ^= rng << 13;
-                    rng ^= rng >> 7;
-                    rng ^= rng << 17;
-                    pool[(rng % pool.len() as u64) as usize]
-                }
-            }
-        };
-        let (u, q) = sucs[pick];
+        let (u, q) = sucs[choose(g, &p, &sucs)];
         steps.push(Step { cur: p.cur, row, act, options: opts, next: u });
         p = q;
+    }
+}
+
+/// One play under an adversary that prefers the vertices in `pref`, in that order (a vertex
+/// not listed comes last, the smaller number first).  Reproduces a hand trace.
+pub fn play(g: &Graph, rule: &Rule, pref: &[u8], budget: usize) -> Outcome {
+    let rank = |u: u8| pref.iter().position(|&x| x == u).unwrap_or(usize::MAX);
+    let (end, trace) = play_with(g, rule, budget, |_, _, sucs| (0..sucs.len()).min_by_key(|&i| sucs[i].0.map_or(usize::MAX, rank)).unwrap());
+    match end {
+        PlayEnd::Won => Outcome::Explores { positions: 0, trace },
+        PlayEnd::Lost => Outcome::Fails { positions: 0, method: format!("play: adversary prefers {}", if pref.is_empty() { "the smallest vertex".to_string() } else { pref.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(" ") }), trace },
+        PlayEnd::Undefined(row) => Outcome::Undefined { row, path: trace },
+        PlayEnd::Budget => Outcome::Unfinished { trace },
     }
 }
 
@@ -1009,6 +1047,7 @@ fn outcome_json(o: &Outcome, k: u8, paper: bool, start: u8) -> String {
         Outcome::Undefined { row, path } => format!("{{\"status\":\"undefined\",{},\"row\":{},\"path\":{}}}", model, js(&row.text(k)), trace_json(path, k)),
         Outcome::Overflow { positions } => format!("{{\"status\":\"overflow\",{},\"positions\":{}}}", model, positions),
         Outcome::Unrefuted { walks } => format!("{{\"status\":\"unrefuted\",{},\"walks\":{}}}", model, walks),
+        Outcome::Unfinished { trace } => format!("{{\"status\":\"unfinished\",{},\"trace\":{}}}", model, trace_json(trace, k)),
     }
 }
 fn err(msg: &str) -> String {
@@ -1016,7 +1055,7 @@ fn err(msg: &str) -> String {
 }
 
 // ------------------------------------------------------------------ the request protocol
-/// Lines of `key value`.  Keys: `cmd` (`step`, `exact`, `walks`, `answer`),
+/// Lines of `key value`.  Keys: `cmd` (`step`, `exact`, `walks`, `play`, `answer`),
 /// `k`, `graph` (`n s u-v,...`), `default` (a formula name), `cap`, `walks`,
 /// `budget`, `colours` (space-separated, for `step`), `cur`, `vis`
 /// (space-separated visited vertices), `row` (for `answer`), `model`
@@ -1039,10 +1078,11 @@ struct Request {
     vis: Vec<u8>,
     row: Option<String>,
     model: String,
+    prefer: Vec<u8>,
 }
 
 fn parse_request(input: &str) -> Request {
-    let mut r = Request { cmd: String::new(), k: 5, graph: None, table: Map::default(), bad_rows: Vec::new(), default: None, bad_default: None, cap: 1_000_000, walks: 64, budget: 200_000, colours: Vec::new(), cur: None, vis: Vec::new(), row: None, model: String::new() };
+    let mut r = Request { cmd: String::new(), k: 5, graph: None, table: Map::default(), bad_rows: Vec::new(), default: None, bad_default: None, cap: 1_000_000, walks: 64, budget: 200_000, colours: Vec::new(), cur: None, vis: Vec::new(), row: None, model: String::new(), prefer: Vec::new() };
     let mut in_table = false;
     for line in input.lines() {
         let line = line.trim();
@@ -1089,6 +1129,7 @@ fn parse_request(input: &str) -> Request {
             "vis" => r.vis = val.split_whitespace().filter_map(|x| x.parse().ok()).collect(),
             "row" => r.row = Some(val.to_string()),
             "model" => r.model = val.to_string(),
+            "prefer" => r.prefer = val.split_whitespace().filter_map(|x| x.parse().ok()).collect(),
             "table" => in_table = true,
             _ => {}
         }
@@ -1180,6 +1221,13 @@ pub fn handle(input: &str) -> String {
             outcome_json(&exact_game(&g, &rule, cap), r.k, rule.terminating, g.s)
         }
         "walks" => outcome_json(&walks(&g, &rule, r.walks.min(100_000), r.budget.clamp(10, 5_000_000)), r.k, rule.terminating, g.s),
+        "play" => {
+            // one execution under an adversary with a stated preference order (`prefer v1 v2 ...`)
+            if let Some(&bad) = r.prefer.iter().find(|&&v| v >= g.n) {
+                return err(&format!("prefer: vertex {} is not in the graph (0..{})", bad, g.n - 1));
+            }
+            outcome_json(&play(&g, &rule, &r.prefer, r.budget.clamp(10, 5_000_000)), r.k, rule.terminating, g.s)
+        }
         other => err(&format!("unknown cmd {}", other)),
     }
 }
@@ -1584,6 +1632,56 @@ mod tests {
         }
         let ok = handle("cmd exact\nk 6\ngraph 3 0 0-1,1-2\ndefault agen6\n");
         assert!(ok.contains("\"status\":\"explores\""), "{}", ok);
+    }
+
+    #[test]
+    fn play_reproduces_the_hand_traces_under_a_stated_adversary() {
+        // the traces of workbench/notes/agen6-hand-trace.xlsx, through the request protocol
+        let steps = |out: &str| -> Vec<(String, String)> {
+            // rows and actions in order, from the JSON of the trace
+            let mut v = Vec::new();
+            for chunk in out.split("{\"cur\":").skip(1) {
+                let row = chunk.split("\"row\":\"").nth(1).unwrap().split('"').next().unwrap().to_string();
+                let paint = chunk.split("\"paint\":").nth(1).unwrap().split(',').next().unwrap().to_string();
+                let target: i32 = chunk.split("\"target\":").nth(1).unwrap().split(',').next().unwrap().parse().unwrap();
+                let t = match target { -1 => "stay".to_string(), -2 => "stop".to_string(), c => c.to_string() };
+                v.push((row, format!("{}>{}", paint, t)));
+            }
+            v
+        };
+        let check = |graph: &str, prefer: &str, expected: &[(&str, &str)]| {
+            let out = handle(&format!("cmd play\nk 6\ngraph {}\ndefault agen6\nprefer {}\n", graph, prefer));
+            assert!(out.contains("\"status\":\"explores\"") && out.contains("\"model\":\"paper\""), "{}", out);
+            let got = steps(&out);
+            let want: Vec<(String, String)> = expected.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
+            assert_eq!(got, want, "{}", graph);
+        };
+        check("3 0 0-1,1-2", "0 1 2", &PATH_TRACE);
+        check("3 0 0-1,1-2,0-2", "0 1 2", &TRIANGLE_TRACE);
+        check("4 0 0-1,0-2,1-3", "1 2 3 0", &TREE_TRACE);
+    }
+
+    #[test]
+    fn play_reports_failures_undefined_rows_and_unfinished_plays() {
+        let wrong = "table\n0.10 1>0\n0.01 0>stop\nend\n";
+        // stops on vertex 1
+        let out = handle(&format!("cmd play\nk 2\ngraph 2 0 0-1\n{}", wrong));
+        assert!(out.contains("\"status\":\"fails\"") && out.contains("\"reason\":\"stopped_off_start\"") && out.contains("\"stopped_at\":1"), "{}", out);
+        // no rule for the first row
+        let undef = handle("cmd play\nk 2\ngraph 2 0 0-1\ndefault none\n");
+        assert!(undef.contains("\"status\":\"undefined\""), "{}", undef);
+        // sigma* never stops: with a small budget the play is unfinished, with a large one it is caught repeating
+        let g = "graph 4 0 0-1,1-2,2-3";
+        let unf = handle(&format!("cmd play\nk 5\nmodel paper\n{}\ndefault sigma\nbudget 10\n", g));
+        assert!(unf.contains("\"status\":\"unfinished\""), "{}", unf);
+        let rep = handle(&format!("cmd play\nk 5\nmodel paper\n{}\ndefault sigma\nbudget 1000\n", g));
+        assert!(rep.contains("\"status\":\"fails\"") && rep.contains("\"reason\":\"never_stops\"") && !rep.contains("\"repeat_at\":null"), "{}", rep);
+        // a vertex outside the graph in `prefer` is an error
+        assert!(handle("cmd play\nk 6\ngraph 3 0 0-1,1-2\ndefault agen6\nprefer 0 7\n").contains("not in the graph"));
+        // a preference for the other neighbour changes the order of a tie, not the outcome
+        let a = handle("cmd play\nk 6\ngraph 4 0 0-1,0-2,1-3\ndefault agen6\nprefer 1 2 3 0\n");
+        let b = handle("cmd play\nk 6\ngraph 4 0 0-1,0-2,1-3\ndefault agen6\nprefer 2 1 3 0\n");
+        assert!(a.contains("\"status\":\"explores\"") && b.contains("\"status\":\"explores\"") && a != b);
     }
 
     #[test]

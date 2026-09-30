@@ -54,9 +54,9 @@ the engine (base64) so it opens from a `file://` URL.  `site/index.html` +
 
 ## Protocol (for other front ends)
 
-`run` takes UTF-8 text lines `key value`: `cmd step|exact|walks|answer`,
+`run` takes UTF-8 text lines `key value`: `cmd step|exact|walks|play|answer`,
 `k`, `graph n s u-v,...`, `default NAME`, `cap`, `walks`, `budget`,
-`colours c0 c1 ...`, `cur v`, `vis v1 v2 ...`, `row own.bag`, `model
+`colours c0 c1 ...`, `cur v`, `vis v1 v2 ...`, `row own.bag`, `prefer v1 v2 ...`, `model
 classic|paper`, and a block `table` … `end` of `row paint>target` lines, where
 `target` is a colour number, `stay` (also `s`, `-`) or `stop`; the numbers 254
 and 255 are not colours and are rejected.  It returns a `u32` little-endian
@@ -65,6 +65,18 @@ the automatic choice; for `exact`/`walks` `{status: explores|fails|undefined|
 overflow|unrefuted, positions, method, trace:{repeat_at, unvisited, steps:[{cur,
 row, paint, target, options, next}]}}`.  `cargo test` in `game-wasm/` checks
 the engine against the native `cegis` numbers on Sketch I.
+
+### One play under a named adversary (`cmd play`)
+
+`cmd play` runs a single execution and answers with its full trace, so a hand
+trace can be reproduced step by step.  The adversary chooses, whenever several
+neighbours carry the target colour, the one listed first in `prefer v1 v2 ...`
+(a vertex not listed comes last, the smaller number first; a vertex outside the
+graph is an error).  `budget` limits the number of steps (at least 10).  The
+answer is `explores` (the play won), `fails` (it stopped in the wrong place or
+repeated a position), `undefined` (no action for a row) or `unfinished` (the
+budget ran out before the play was decided).  It shows one adversary's play;
+only `exact` covers every adversary.
 
 ### Paper model (`model paper`)
 
