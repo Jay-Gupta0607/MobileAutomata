@@ -1,14 +1,24 @@
-// Checks the pure logic of the page (the block between `<page-logic>` and `</page-logic>` in
-// site/index.html): the paper-model status, the colour names and the rule descriptions.
+// Checks the page (site/index.html): that its script is valid JavaScript at all, and the pure logic in it
+// (the block between `<page-logic>` and `</page-logic>`): the paper-model status, the colour names and the
+// rule descriptions.
 // It is also held to the engine: for every paper-model fixture that has a trace, the page's verdict
 // must be the engine's (status, reason and the three indicators).
 //   node testdata/check_page_logic.mjs
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import vm from 'node:vm';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(here, '..', '..', 'site', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
+// 0. the whole script must compile: a stray backtick inside one of the code templates (they are template
+// literals) ends the string early and the page then does not load at all, which no test of the pieces notices
+const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+if (scripts.length === 0) throw new Error('no <script> in site/index.html');
+for (const [i, src] of scripts.entries()) {
+  try { new vm.Script(src, { filename: `index.html script ${i + 1}` }); }
+  catch (e) { console.log(`FAIL  the page script does not compile: ${e.message}`); process.exit(1); }
+}
 const a = html.indexOf('// <page-logic>'), b = html.indexOf('// </page-logic>');
 if (a < 0 || b < a) throw new Error('the page-logic block was not found in site/index.html');
 const { paperStatus, colourLabel, AGEN6_COLOURS, AGEN6_RULES } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, AGEN6_COLOURS, AGEN6_RULES };')();

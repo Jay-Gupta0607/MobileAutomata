@@ -345,7 +345,8 @@ const ALGO_TEMPLATES = {
 // Simulates a semi-DFS: head1 probes each init neighbour (rules 1, 2, 4), head2 decides
 // (rules 6-9), and the agent stops on the start vertex (rule 9).  Needs 6 colours.
 // The paper defines no rule for fin (the agent is on a fin vertex only after it stopped):
-// returning null leaves that row undefined.  `rule` is the paper's rule number, shown while playing.
+// returning null leaves that row undefined.  The rule field is the paper's rule number, shown while playing.
+// (No backticks in this comment: the template is itself a template literal.)
 const INIT = 0, PATH = 1, FIN = 2, HEAD1 = 3, HEAD2 = 4, NEIGH = 5;
 if (own === INIT) {
   if (has(PATH)) return { paint: NEIGH, target: HEAD1, rule: 1 };   // rule 1
