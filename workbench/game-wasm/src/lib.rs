@@ -1860,6 +1860,40 @@ mod tests {
     }
 
     #[test]
+    fn a_vertex_can_be_repainted_to_the_initial_colour_without_forgetting_the_visit() {
+        // Section 5 of the paper: the agent may repaint a vertex from a later colour back to the initial one (colour 0).
+        // Colour 0 is also what a never-visited vertex looks like to the agent, but the visit is recorded apart from the
+        // colours, so exploring must still count that vertex.
+        let g = Graph::parse("2 0 0-1").unwrap();
+        let root = Pos { chi: 0, cur: 0, vis: 1, term: false };
+        // vertex 0 paints itself 1 and moves to its white neighbour; vertex 1 paints itself 2 and goes back (to colour 1) ...
+        let (_, at1) = successors(&g, &root, Action { paint: 1, target: 0 }, true)[0];
+        let (_, at0) = successors(&g, &at1, Action { paint: 2, target: 1 }, true)[0];
+        assert_eq!((at0.cur, colour(at0.chi, 0), colour(at0.chi, 1)), (0, 1, 2));
+        // ... and now vertex 0, colour 1, repaints itself to the INITIAL colour and moves on
+        let (_, after) = successors(&g, &at0, Action { paint: 0, target: 2 }, true)[0];
+        assert_eq!(colour(after.chi, 0), 0, "vertex 0 was colour 1 and is colour 0 again, as if untouched");
+        assert_eq!(after.vis, 0b11, "but both vertices are still recorded as visited");
+        // a table row may paint colour 0 from another colour, through the protocol, and is not rejected
+        let ans = handle("cmd answer\nk 3\nrow 1.100\ntable\n1.100 0>stay\nend\n");
+        assert!(ans.contains("\"paint\":0") && ans.contains("\"defined\":true"), "{}", ans);
+        // a rule that depends on the repaint: vertex 0 goes 0 -> 1 -> 0, and only then does its row say "stop"
+        let rows = [("0.100", "1>0"), ("0.010", "2>1"), ("1.001", "0>2"), ("2.100", "2>0"), ("0.001", "0>stop")];
+        let rule = paper_rule_from_table(3, &rows);
+        match exact_game(&g, &rule, 1000) {
+            Outcome::Explores { trace, .. } => assert_eq!((trace.steps.len(), trace.unvisited, trace.stopped_at), (5, 0, Some(0))),
+            _ => panic!("the repaint to the initial colour must let this rule stop on the start"),
+        }
+        // the same rule, stopping replaced by staying: distinguished from stop, the agent never terminates
+        let mut stay_rows = rows;
+        stay_rows[4] = ("0.001", "0>stay");
+        match exact_game(&g, &paper_rule_from_table(3, &stay_rows), 1000) {
+            Outcome::Fails { trace, .. } => assert_eq!((trace.stopped_at, trace.repeat_at.is_some()), (None, true)),
+            _ => panic!("stay is not stop: the agent never terminates"),
+        }
+    }
+
+    #[test]
     fn stop_makes_a_terminal_position_only_in_the_paper_model() {
         let g = Graph::parse("2 0 0-1").unwrap();
         let p = Pos { chi: 0, cur: 0, vis: 1, term: false };
