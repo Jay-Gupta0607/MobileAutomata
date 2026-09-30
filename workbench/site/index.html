@@ -449,7 +449,7 @@ function compileAlgo(src, k, maxDeg) {
     if (!(Number.isInteger(paint) && paint >= 0 && paint < k) || !(target === -1 || target === -2 || (Number.isInteger(target) && target >= 0 && target < k))) { if (errors.length < 5) errors.push(`${rowText}: paint ${paint}, target ${target} are not colours below ${k}`); return; }
     table.set(rowText, Number.isInteger(rule) ? { paint, target, rule } : { paint, target }); // rule: the paper's rule number, if the code gives one
   });
-  return { src, table, maxDeg, k, errors };
+  return { src, table, maxDeg, k, errors, stops: [...table.values()].some((a) => a.target === -2) };
 }
 function ensureAlgo() {
   // recompile when the palette or the graph's largest degree changed
@@ -463,7 +463,13 @@ function parseTableText(text) {
   for (let line of text.split('\n')) { line = line.split('#')[0].trim(); if (!line) continue; const [r, a] = line.split(/\s+/); if (!r || !a) throw new Error('bad line: ' + line); const [p, t] = a.split('>'); if (!/^\d+\.[0-9a-f]+$/.test(r) || p === undefined || t === undefined) throw new Error('bad line: ' + line); m.set(r, { paint: +p, target: t === 'stay' || t === 's' ? -1 : t === 'stop' ? -2 : +t }); }
   return m;
 }
-function usesStop() { ensureAlgo(); return [...state.table.values(), ...(state.algo ? state.algo.table.values() : [])].some((a) => a.target === -2); }
+// Does a rule in use stop?  Asked with every request, so cached: the compiled code is scanned once when it is compiled,
+// the hand table once after each change (every change calls save(), which clears the cache).
+function usesStop() {
+  ensureAlgo();
+  if (state.tableStops === undefined) state.tableStops = [...state.table.values()].some((a) => a.target === -2);
+  return state.tableStops || !!(state.algo && state.algo.stops);
+}
 function defaultName() { return state.def === 'sweep' ? `sweep:${state.sweep.join(',')}` : state.def; }
 function requestText(cmd, extra) {
   let s = `cmd ${cmd}\nk ${state.k}\ngraph ${graphText()}\ndefault ${defaultName()}\n`;
@@ -479,7 +485,7 @@ function bagChips(rowText) {
 }
 
 // ------------------------------------------------------------ persistence (per-browser convenience only)
-function save() { try { localStorage.setItem('cew.state', JSON.stringify({ k: state.k, nodes: state.nodes, edges: state.edges, start: state.start, table: [...state.table.entries()], def: state.def, sweep: state.sweep, algoSrc: state.algoSrc })); } catch (e) { /* storage unavailable */ } }
+function save() { state.tableStops = undefined; try { localStorage.setItem('cew.state', JSON.stringify({ k: state.k, nodes: state.nodes, edges: state.edges, start: state.start, table: [...state.table.entries()], def: state.def, sweep: state.sweep, algoSrc: state.algoSrc })); } catch (e) { /* storage unavailable */ } }
 function restore() {
   try { const s = JSON.parse(localStorage.getItem('cew.state') || 'null'); if (!s || !s.nodes || !s.nodes.length) return false; state.k = s.k || 5; state.nodes = s.nodes; state.edges = s.edges || []; state.start = s.start || 0; state.table = new Map(s.table || []); state.def = s.def || 'none'; state.sweep = s.sweep || [0, 4, 0]; state.algoSrc = s.algoSrc || ''; return true; } catch (e) { return false; }
 }
@@ -646,7 +652,7 @@ function renderPlay() {
   const bUndo = $('#b-undo'); if (bUndo) bUndo.addEventListener('click', () => { stopPlay(); undo(); render(); });
   $('#b-step').disabled = !!p.done; $('#b-auto').disabled = !!p.done; $('#b-play').disabled = !!p.done;
 }
-function colourOptions(withStay) { let s = ''; for (let c = 0; c < state.k; c++) s += `<option value="${c}">${namedColours() ? c + ' ' + cname(c) : c === 0 ? '0 white' : c}</option>`; if (withStay) s += '<option value="-1">stay</option>'; return s; }
+function colourOptions(withStay) { let s = ''; for (let c = 0; c < state.k; c++) s += `<option value="${c}">${namedColours() ? c + ' ' + cname(c) : c === 0 ? '0 white' : c}</option>`; if (withStay) s += '<option value="-1">stay</option><option value="-2">stop (paper model)</option>'; return s; }
 function renderRules() {
   ensureAlgo();
   const ta = $('#algo'); if (document.activeElement !== ta && ta.value !== state.algoSrc) ta.value = state.algoSrc;
