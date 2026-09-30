@@ -1484,6 +1484,43 @@ mod tests {
     }
 
     #[test]
+    fn agen6_rows_match_the_page_template() {
+        // testdata/agen6_rows_deg4.txt is produced by the page's JavaScript template
+        // (`node testdata/check_agen6_template.mjs --write`); every row up to degree 4, six colours.
+        fn bags(c: usize, left: u8, cnt: &mut [u8; MAXK], out: &mut Vec<[u8; MAXK]>) {
+            if c == MAXK {
+                if cnt.iter().sum::<u8>() >= 1 {
+                    out.push(*cnt);
+                }
+                return;
+            }
+            for x in 0..=left {
+                cnt[c] = x;
+                bags(c + 1, left - x, cnt, out);
+            }
+            cnt[c] = 0;
+        }
+        let mut all = Vec::new();
+        bags(0, 4, &mut [0; MAXK], &mut all);
+        let mut lines = Vec::new();
+        for own in 0..6u8 {
+            for cnt in &all {
+                let row = Row { own, cnt: *cnt };
+                lines.push(match Formula::AGen6.action(&row, 6) {
+                    Some(a) => format!("{} {}", row.text(6), a.text()),
+                    None => format!("{} undefined", row.text(6)),
+                });
+            }
+        }
+        lines.sort();
+        let fixture: Vec<&str> = include_str!("../testdata/agen6_rows_deg4.txt").lines().collect();
+        assert_eq!(lines.len(), fixture.len());
+        for (mine, theirs) in lines.iter().zip(&fixture) {
+            assert_eq!(mine, theirs);
+        }
+    }
+
+    #[test]
     fn stop_makes_a_terminal_position_only_in_the_paper_model() {
         let g = Graph::parse("2 0 0-1").unwrap();
         let p = Pos { chi: 0, cur: 0, vis: 1, term: false };
