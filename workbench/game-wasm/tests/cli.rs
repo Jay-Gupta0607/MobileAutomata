@@ -151,3 +151,16 @@ fn usage_errors_exit_64_and_explain() {
     assert_eq!(code(&h), 0);
     assert!(stdout(&h).contains("usage:") && stdout(&h).contains("exit status"));
 }
+
+#[test]
+fn a_request_file_is_sent_exactly_as_written() {
+    let req = "cmd play\nk 6\ngraph 3 0 0-1,1-2\ndefault agen6\nprefer 0 1 2\n";
+    let f = Temp::new("request.req", req);
+    let via_file = run(&["--request-file", f.path()]);
+    let via_args = run(&["play", "--graph", "3 0 0-1,1-2", "--rule", "agen6", "--prefer", "0 1 2"]);
+    assert_eq!(code(&via_file), 0, "{}", stderr(&via_file));
+    assert_eq!(stdout(&via_file), stdout(&via_args), "the same request, the same answer");
+    // it takes no command, and a missing file is a usage error
+    assert_eq!(code(&run(&["play", "--request-file", f.path()])), 64);
+    assert_eq!(code(&run(&["--request-file", "no-such-file.req"])), 64);
+}

@@ -38,6 +38,8 @@ search
 output
   --summary           one line instead of the JSON
   --request           print the request that would be sent and stop
+  --request-file FILE send a request of the line protocol exactly as written (no command or other
+                      option needed); the fixtures of testdata/fixtures are such files
 
 exit status
   0 explores    1 fails    2 undefined row    3 overflow (raise --cap)
@@ -79,10 +81,11 @@ struct Args {
     row: Option<String>,
     summary: bool,
     request: bool,
+    request_file: Option<String>,
 }
 
 fn parse_args(argv: &[String]) -> Result<Args, String> {
-    let mut a = Args { command: String::new(), graph: None, rule: None, table: None, k: None, model: None, cap: None, walks: None, budget: None, prefer: None, row: None, summary: false, request: false };
+    let mut a = Args { command: String::new(), graph: None, rule: None, table: None, k: None, model: None, cap: None, walks: None, budget: None, prefer: None, row: None, summary: false, request: false, request_file: None };
     let mut i = 0;
     while i < argv.len() {
         let arg = argv[i].as_str();
@@ -116,12 +119,16 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
             "--row" => a.row = Some(value(arg)?),
             "--summary" => a.summary = true,
             "--request" => a.request = true,
+            "--request-file" => a.request_file = Some(value(arg)?),
             "-h" | "--help" => return Err(String::new()),
             _ if arg.starts_with("--") => return Err(format!("unknown option {}", arg)),
             _ if a.command.is_empty() => a.command = arg.to_string(),
             _ => return Err(format!("unexpected argument {}", arg)),
         }
         i += 1;
+    }
+    if a.request_file.is_some() {
+        return if a.command.is_empty() { Ok(a) } else { Err("--request-file is used alone: the file holds the whole request".into()) };
     }
     match a.command.as_str() {
         "exact" | "walks" | "play" | "answer" => Ok(a),
@@ -258,7 +265,11 @@ fn main() -> ExitCode {
             return ExitCode::from(64);
         }
     };
-    let request = match build_request(&args) {
+    let built = match &args.request_file {
+        Some(path) => std::fs::read_to_string(path).map_err(|e| format!("cannot read {}: {}", path, e)),
+        None => build_request(&args),
+    };
+    let request = match built {
         Ok(r) => r,
         Err(msg) => {
             eprintln!("explore: {}\n{}", msg, SHORT);
