@@ -24,7 +24,7 @@ for (const [name, text] of [['site/index.html', html], ['docs/index.html', readF
 }
 const a = html.indexOf('// <page-logic>'), b = html.indexOf('// </page-logic>');
 if (a < 0 || b < a) throw new Error('the page-logic block was not found in site/index.html');
-const { paperStatus, colourLabel, AGEN6_COLOURS, AGEN6_RULES } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, AGEN6_COLOURS, AGEN6_RULES };')();
+const { paperStatus, colourLabel, colourHint, COLOUR_NEED, AGEN6_COLOURS, AGEN6_RULES } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, AGEN6_COLOURS, AGEN6_RULES };')();
 
 let bad = 0;
 const check = (ok, what) => { if (!ok) { bad++; console.log('FAIL  ' + what); } };
@@ -61,6 +61,15 @@ same(AGEN6_RULES.length, 12, 'rule descriptions for 1 to 11 (index 0 unused)');
 check(AGEN6_RULES.slice(1).every((t) => typeof t === 'string' && t.length > 10), 'every rule has a description');
 check(AGEN6_RULES[0] === null, 'index 0 is unused');
 
+// 2b. the hint next to the colours picker
+same(colourHint('agen6', 6), { text: 'A_Gen6 needs 6 colours', warn: false }, 'A_Gen6 with six colours');
+same(colourHint('agen6', 3), { text: 'A_Gen6 needs 6 colours (now 3)', warn: true }, 'A_Gen6 with too few colours');
+same(colourHint('flipsweep4', 4), { text: 'flipsweep4 needs at least 4 colours', warn: false }, 'a minimum that is met');
+same(colourHint('flipsweep5', 4), { text: 'flipsweep5 needs at least 5 colours (now 4)', warn: true }, 'a minimum that is not met');
+same([colourHint('flipsweep5', 6).warn, colourHint('chase3', 2).warn, colourHint('eat3', 3).warn], [false, true, false], 'the boundary is k = n');
+same([colourHint('sigma', 2), colourHint('none', 5), colourHint('sweep', 3), colourHint(null, 6), colourHint('chasewhite', 2)], [null, null, null, null, null], 'rules that work with any number have no hint');
+same(Object.keys(COLOUR_NEED).sort(), ['agen6', 'chase3', 'eat3', 'flipsweep4', 'flipsweep4b', 'flipsweep5', 'flipsweep5d'], 'the rules with a stated need');
+
 // 3. the page's verdict against the engine's, on every paper-model fixture with a trace
 const dir = join(here, 'fixtures');
 let compared = 0;
@@ -83,4 +92,4 @@ for (const f of readdirSync(dir).filter((x) => x.endsWith('.json'))) {
 check(compared >= 8, `only ${compared} engine verdicts were compared`);
 
 console.log(bad === 0 ? `page logic ok (${compared} engine verdicts compared)` : `${bad} problem(s)`);
-process.exit(bad === 0 ? 0 : 1);
+process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

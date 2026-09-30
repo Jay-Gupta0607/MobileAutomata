@@ -144,6 +144,21 @@ same(P.namedColours(), true, 'the A_Gen6 template names its colours');
 setup({ k: 5, def: 'sigma', graph: '3 0 0-1,1-2' });
 same([P.namedColours(), P.cname(0), P.cname(2)], [false, 'white', 'colour 2'], 'classic rules keep numbers');
 
+// 7b. the hint next to the colours picker, as the page draws it
+const hint = () => (P.render(), { text: String(element('#khint').textContent), warn: String(element('#khint').className).includes('warn') });
+setup({ k: 6, def: 'agen6', graph: '3 0 0-1,1-2' });
+same(hint(), { text: 'A_Gen6 needs 6 colours', warn: false }, 'the hint for A_Gen6 with six colours');
+setup({ k: 3, def: 'agen6', graph: '3 0 0-1,1-2' });
+same(hint(), { text: 'A_Gen6 needs 6 colours (now 3)', warn: true }, 'the hint warns when there are too few colours');
+setup({ k: 6, def: 'none', graph: '3 0 0-1,1-2', algoSrc: P.ALGO_TEMPLATES.agen6 });
+same(hint().text, 'A_Gen6 needs 6 colours', 'the A_Gen6 template has the same hint');
+setup({ k: 6, def: 'agen6', graph: '3 0 0-1,1-2', algoSrc: 'return { paint: 1, target: "stay" };' });
+same(hint(), { text: '', warn: false }, 'other code in use has no stated need, whatever the fallback says');
+setup({ k: 4, def: 'flipsweep5', graph: '3 0 0-1,1-2' });
+same(hint(), { text: 'flipsweep5 needs at least 5 colours (now 4)', warn: true }, 'a built-in rule with a minimum');
+setup({ k: 2, def: 'sigma', graph: '3 0 0-1,1-2' });
+same(hint(), { text: '', warn: false }, 'sigma* works with any number: no hint');
+
 // 8. compiled code keeps the paper's rule number and knows that it stops
 const compiled = P.compileAlgo(P.ALGO_TEMPLATES.agen6, 6, 3);
 same([compiled.table.get('4.000010').rule, compiled.table.get('4.000010').target, compiled.stops], [9, -2, true], 'the template compiles with rule numbers and a stop');
@@ -151,4 +166,4 @@ same(compiled.errors, [], 'and without rejected rows');
 same(compiled.table.has('2.000001'), false, 'fin rows stay undefined');
 
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
-process.exit(bad === 0 ? 0 : 1);
+process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)
