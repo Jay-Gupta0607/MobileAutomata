@@ -56,10 +56,32 @@ the engine (base64) so it opens from a `file://` URL.  `site/index.html` +
 
 `run` takes UTF-8 text lines `key value`: `cmd step|exact|walks|answer`,
 `k`, `graph n s u-v,...`, `default NAME`, `cap`, `walks`, `budget`,
-`colours c0 c1 ...`, `cur v`, `vis v1 v2 ...`, `row own.bag`, and a block
-`table` … `end` of `row paint>target` lines.  It returns a `u32` little-endian
+`colours c0 c1 ...`, `cur v`, `vis v1 v2 ...`, `row own.bag`, `model
+classic|paper`, and a block `table` … `end` of `row paint>target` lines, where
+`target` is a colour number, `stay` (also `s`, `-`) or `stop`; the numbers 254
+and 255 are not colours and are rejected.  It returns a `u32` little-endian
 length followed by JSON: for `step` the row, its source, action, options and
 the automatic choice; for `exact`/`walks` `{status: explores|fails|undefined|
 overflow|unrefuted, positions, method, trace:{repeat_at, unvisited, steps:[{cur,
 row, paint, target, options, next}]}}`.  `cargo test` in `game-wasm/` checks
 the engine against the native `cegis` numbers on Sketch I.
+
+### Paper model (`model paper`)
+
+The default `model classic` is the game above: the agent wins as soon as every
+vertex is visited, and `stop` would only mean "stay".  `model paper` is the
+model of Takahashi et al. (arXiv 2505.02789, Section 2): `stop` ends the run
+after painting the vertex, and the agent explores only if it stops **on the
+start vertex with every vertex visited**; a play that never stops, stops
+elsewhere, or stops before everything is visited is a failure.  With no
+`model` key the paper model is used whenever the rule can stop: `default
+agen6` (A_Gen6, Algorithm 2, colours 0 init, 1 path, 2 fin, 3 head1, 4 head2,
+5 neigh; needs `k 6`) or a table row answering `stop`.  A colour target that
+no neighbour has still leaves the agent in place in both models.
+
+Every `exact`/`walks` answer carries `"model"`, and each trace carries
+`stopped_at` (the vertex the agent stopped on, or null; a `stop` action is
+reported as target `-2`, `stay` as `-1`).  In the paper model an
+`explores`/`fails` answer also carries `indicators` `{visited_all, stopped,
+stopped_at_start}` and a failure a `reason`: `never_stops`, `stopped_early`
+or `stopped_off_start`.
