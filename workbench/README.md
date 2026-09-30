@@ -52,6 +52,29 @@ the engine (base64) so it opens from a `file://` URL.  `site/index.html` +
   three deterministic and N random adversary walks first, a cheap way to find
   a failure, never a proof of success.
 
+### The page in the paper model (A_Gen6)
+
+Choose `A_Gen6 (paper model, k=6)` under "answered by", load the template of the same name in the algorithm editor,
+or load one of the four `A_Gen6 ·` presets (the path, the triangle and the tree of the hand traces in
+`notes/agen6-hand-trace.xlsx`, and Sketch I; a preset asks before it replaces rows or an algorithm in use).  Any
+rule that can `stop` (a table row whose target is `stop`) is played the same way.  Then:
+
+* the play does not end when the last vertex is reached: it ends when the agent stops (or a position repeats), and
+  the panel says what happened in the paper's terms: *Explores* (every vertex visited, stopped on the start vertex),
+  *Stopped early* (the unvisited vertices are named and ringed), *Stopped away from the start*, or *Never stops*;
+* three separate indicators show **coverage** (vertices visited), **return** (on, or stopped on, the start vertex)
+  and **termination** (running, stopped, never stops), live during the play;
+* the legend, the colour pickers and the ledger use the paper's colour names (init, path, fin, head1, head2, neigh),
+  and the Play tab shows which of the 11 rules answered the row just read, with a one-line description; the ledger
+  keeps the rule number of each step;
+* the Analysis tab says what failed, from the engine's own reason (never stops, stopped early, stopped away from the
+  start) with the same three indicators, and a found execution can be replayed step by step;
+* the rules table and the define-row prompt offer `stop (paper model)` next to `stay`.
+
+The classic game keeps its own behaviour and wording.  `game-wasm/testdata/check_page_logic.mjs` compiles the page's
+script and holds its paper-model logic to the engine (for every paper-model fixture the page's verdict must equal
+the engine's reason and indicators); `check_wasm_parity.mjs` also requires the A_Gen6 presets to explore.
+
 ## Command line (`explore`)
 
 A native tool over the same engine, for scripts and for checking an algorithm without the page.  It builds
@@ -84,7 +107,8 @@ Native and WebAssembly are held to the same answers by the fixtures in `game-was
 requests with their expected JSON): `cargo test` runs them natively, and after `sh build.sh`,
 `node game-wasm/testdata/check_wasm_parity.mjs` sends the same requests to `site/game.wasm` and also checks that
 `docs/index.html` embeds that build.  `node game-wasm/testdata/check_agen6_template.mjs` checks the page's A_Gen6
-template against the engine's rule.
+template against the engine's rule (action and rule number, for every row up to degree 4), and
+`node game-wasm/testdata/check_page_logic.mjs` checks that the page's script compiles and its paper-model logic.
 
 ## Protocol (for other front ends)
 
