@@ -89,8 +89,10 @@ impl Row {
     }
 }
 
-/// `target`: a colour, or `STAY` (the agent keeps its place).
+/// `target`: a colour, `STAY` (the agent keeps its place) or `STOP` (the
+/// agent terminates on this vertex, after painting it).
 pub const STAY: u8 = 255;
+pub const STOP: u8 = 254;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Action {
@@ -102,6 +104,8 @@ impl Action {
     pub fn text(&self) -> String {
         if self.target == STAY {
             format!("{}>stay", self.paint)
+        } else if self.target == STOP {
+            format!("{}>stop", self.paint)
         } else {
             format!("{}>{}", self.paint, self.target)
         }
@@ -110,7 +114,13 @@ impl Action {
         let (p, t) = s.trim().split_once('>')?;
         let paint: u8 = p.trim().parse().ok()?;
         let t = t.trim();
-        let target = if t == "stay" || t == "s" || t == "-" { STAY } else { t.parse().ok()? };
+        let target = if t == "stay" || t == "s" || t == "-" {
+            STAY
+        } else if t == "stop" {
+            STOP
+        } else {
+            t.parse().ok()?
+        };
         Some(Action { paint, target })
     }
 }
@@ -225,7 +235,7 @@ pub fn row_at(g: &Graph, chi: u128, v: u8) -> Row {
 }
 /// The neighbours the adversary may serve for the target colour `t`.
 pub fn options(g: &Graph, chi: u128, v: u8, t: u8) -> Vec<u8> {
-    if t == STAY {
+    if t == STAY || t == STOP {
         return vec![];
     }
     g.neighbours(v).filter(|&u| colour(chi, u) == t).collect()
@@ -862,6 +872,8 @@ fn mask_list(m: u32) -> String {
 fn target_json(t: u8) -> String {
     if t == STAY {
         "-1".into()
+    } else if t == STOP {
+        "-2".into()
     } else {
         t.to_string()
     }
@@ -976,7 +988,7 @@ pub fn handle(input: &str) -> String {
         return err(&format!("bad table line: {}", r.bad_rows[0]));
     }
     for (row, act) in &r.table {
-        if row.own >= r.k || act.paint >= r.k || (act.target != STAY && act.target >= r.k) || row.cnt[r.k as usize..].iter().any(|&c| c > 0) {
+        if row.own >= r.k || act.paint >= r.k || (act.target != STAY && act.target != STOP && act.target >= r.k) || row.cnt[r.k as usize..].iter().any(|&c| c > 0) {
             return err(&format!("table entry {} {} uses a colour outside 0..{}", row.text(r.k), act.text(), r.k - 1));
         }
     }
@@ -1094,6 +1106,20 @@ mod tests {
             }
             _ => panic!("flipsweep5d must fail on Sketch I"),
         }
+    }
+
+    #[test]
+    fn stop_action_parses_prints_and_validates() {
+        let a = Action::parse("2>stop").unwrap();
+        assert_eq!(a, Action { paint: 2, target: STOP });
+        assert_eq!(a.text(), "2>stop");
+        assert_eq!(Action::parse("3>stay").unwrap().text(), "3>stay");
+        assert_eq!(Action::parse("3>7").unwrap().target, 7);
+        // a table row may answer `stop` (not rejected as an out-of-range colour); the answer reports target -2
+        let out = handle("cmd answer\nk 6\nrow 4.000000\ntable\n4.000000 2>stop\nend\n");
+        assert!(out.contains("\"defined\":true") && out.contains("\"paint\":2") && out.contains("\"target\":-2"), "{}", out);
+        // the adversary is never offered a move for stop
+        assert!(options(&Graph::parse("2 0 0-1").unwrap(), 0, 0, STOP).is_empty());
     }
 
     #[test]
