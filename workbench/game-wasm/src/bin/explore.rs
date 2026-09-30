@@ -162,6 +162,15 @@ fn number(name: &str, v: &str, lo: u64, hi: u64) -> Result<String, String> {
     }
 }
 
+/// A value that goes into the request as it is (rule, model, row) must be one line: a line break
+/// would add protocol lines of its own (`sigma\nmodel classic`).
+fn one_line(name: &str, v: &str) -> Result<(), String> {
+    if v.chars().any(|c| c.is_control()) {
+        return Err(format!("{} must be a single line without control characters", name));
+    }
+    Ok(())
+}
+
 /// An option given for a command that does not read it would have no effect, and no warning.
 fn only_for(a: &Args, option: &str, present: bool, commands: &[&str]) -> Result<(), String> {
     if present && !commands.contains(&a.command.as_str()) {
@@ -191,9 +200,11 @@ fn build_request(a: &Args) -> Result<String, String> {
         r += &format!("graph {}\n", g);
     }
     if let Some(rule) = &a.rule {
+        one_line("--rule", rule)?;
         r += &format!("default {}\n", rule);
     }
     if let Some(m) = &a.model {
+        one_line("--model", m)?;
         r += &format!("model {}\n", m);
     }
     if let Some(v) = &a.cap {
@@ -209,7 +220,9 @@ fn build_request(a: &Args) -> Result<String, String> {
         r += &format!("prefer {}\n", p.split(|c: char| c == ',' || c.is_whitespace()).filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" "));
     }
     if a.command == "answer" {
-        r += &format!("row {}\n", a.row.as_deref().ok_or("answer needs --row own.bag")?);
+        let row = a.row.as_deref().ok_or("answer needs --row own.bag")?;
+        one_line("--row", row)?;
+        r += &format!("row {}\n", row);
     }
     if let Some(t) = &a.table {
         r += "table\n";

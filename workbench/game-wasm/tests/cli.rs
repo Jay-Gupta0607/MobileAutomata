@@ -260,3 +260,25 @@ fn a_closed_pipe_does_not_hide_the_outcome() {
     assert_eq!(out.status.code(), Some(0), "stderr: {}", String::from_utf8_lossy(&out.stderr));
     assert!(!String::from_utf8_lossy(&out.stderr).contains("panicked"), "{}", String::from_utf8_lossy(&out.stderr));
 }
+
+#[test]
+fn a_line_break_in_an_option_cannot_add_request_lines() {
+    // without the check `--rule "sigma\nmodel paper"` sends two protocol lines
+    let o = run(&["exact", "--graph", PATH4, "--rule", "sigma\nmodel paper", "--request"]);
+    assert_eq!(code(&o), 64, "it printed the request: {}", stdout(&o));
+    assert!(stderr(&o).contains("--rule") && stderr(&o).contains("single line"), "{}", stderr(&o));
+    for args in [
+        &["exact", "--graph", PATH4, "--rule", "sigma", "--model", "classic\ncap 5"][..],
+        &["answer", "--rule", "agen6", "--row", "4.001000\ncmd exact"][..],
+        &["exact", "--graph", PATH4, "--rule", "sigma\r\ncap 5"][..],
+        &["exact", "--graph", PATH4, "--rule", "sig\tma"][..],
+    ] {
+        let o = run(args);
+        assert_eq!(code(&o), 64, "{:?}", args);
+        assert!(stderr(&o).contains("single line"), "{:?}: {}", args, stderr(&o));
+    }
+    // ordinary values, including a rule with parentheses and commas, are untouched
+    let ok = run(&["exact", "--graph", PATH4, "--rule", "sweep(0,4,0)", "--request"]);
+    assert_eq!(code(&ok), 0);
+    assert!(stdout(&ok).lines().any(|l| l == "default sweep(0,4,0)"), "{}", stdout(&ok));
+}
