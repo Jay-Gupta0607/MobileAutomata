@@ -310,3 +310,11 @@ fn a_request_file_takes_no_other_request_options() {
     assert_eq!(code(&run(&["--request-file", f.path(), "--summary"])), 0);
     assert!(stdout(&run(&["--request-file", f.path(), "--request"])).contains("default agen6"));
 }
+
+#[test]
+fn two_rules_on_one_table_line_are_an_error_not_a_silent_loss() {
+    let t = Temp::new("twice.txt", "0.10 1>0 0.01 0>stop\n");
+    let o = run(&["exact", "--graph", "2 0 0-1", "--k", "2", "--table", t.path()]);
+    assert_eq!(code(&o), 64, "{}", stdout(&o));
+    assert!(stdout(&o).contains("bad table line"), "{}", stdout(&o));
+}

@@ -164,6 +164,9 @@ impl Graph {
                 }
             }
         }
+        if it.next().is_some() {
+            return Err("graph: unexpected text after the edge list (edges are `u-v` separated by commas, without spaces)".into());
+        }
         let g = Graph { n, s, adj, edges };
         if !g.is_connected() {
             return Err("graph: not connected".into());
@@ -1095,9 +1098,11 @@ fn parse_request(input: &str) -> Request {
                 in_table = false;
                 continue;
             }
+            // exactly two tokens, `own.bag paint>target`: a third would be dropped without a word
             let mut it = line.split_whitespace();
-            match (it.next().and_then(Row::parse), it.next().and_then(Action::parse)) {
-                (Some(row), Some(act)) => {
+            let (row, act, extra) = (it.next(), it.next(), it.next());
+            match (row.and_then(Row::parse), act.and_then(Action::parse), extra) {
+                (Some(row), Some(act), None) => {
                     r.table.insert(row, act);
                 }
                 _ => r.bad_rows.push(line.to_string()),
@@ -1771,6 +1776,23 @@ mod tests {
         let sizes: std::collections::BTreeSet<u8> = many.iter().map(|(n, _)| *n).collect();
         assert!(sizes.len() >= 6 && sizes.iter().any(|&n| n >= 10), "sizes {:?}", sizes);
         assert!(many.iter().map(|(_, e)| e.clone()).collect::<std::collections::BTreeSet<_>>().len() >= 35);
+    }
+
+    #[test]
+    fn extra_tokens_on_a_table_line_or_after_the_edge_list_are_errors() {
+        // two rules on one line: the second used to be dropped, silently
+        let two = handle("cmd exact\nk 2\ngraph 2 0 0-1\ntable\n0.10 1>0 0.01 0>stop\nend\n");
+        assert!(two.contains("\"status\":\"error\"") && two.contains("bad table line: 0.10 1>0 0.01 0>stop"), "{}", two);
+        let stray = handle("cmd exact\nk 2\ngraph 2 0 0-1\ntable\n0.10 1>0 junk\nend\n");
+        assert!(stray.contains("bad table line"), "{}", stray);
+        // a spaced edge list used to explore a path instead of the triangle it was meant to be
+        let g = handle("cmd exact\nk 5\ngraph 3 0 0-1,1-2 0-2\ndefault sigma\n");
+        assert!(g.contains("\"status\":\"error\"") && g.contains("unexpected text after the edge list"), "{}", g);
+        assert!(Graph::parse("3 0 0-1,1-2 0-2").is_err());
+        // the plain forms still parse
+        assert!(Graph::parse("3 0 0-1,1-2,0-2").is_ok());
+        assert!(Graph::parse("1 0").is_ok());
+        assert!(handle("cmd exact\nk 2\ngraph 2 0 0-1\ntable\n0.10 1>0\n0.01 0>1\n1.10 1>stop\nend\n").contains("\"status\":\"explores\""));
     }
 
     #[test]
