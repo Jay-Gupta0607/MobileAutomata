@@ -676,7 +676,27 @@ function flash(msg) { const el = $('#choicehint'); if (el) { el.style.fontWeight
 function switchTab(name) { document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === name))); document.querySelectorAll('.panel').forEach((p) => p.classList.toggle('active', p.id === 'panel-' + name)); }
 
 // ------------------------------------------------------------ analysis
+// the same three facts as in the Play tab, from the engine's indicators
+function analysisPills(r) {
+  const ind = r.indicators, t = r.trace;
+  const cov = `<span class="pill ${ind.visited_all ? 'good' : 'bad'}"><b>coverage</b>${ind.visited_all ? 'every vertex visited' : `${t.unvisited.map(NAMES).join(', ')} never visited`}</span>`;
+  const ret = ind.stopped ? `<span class="pill ${ind.stopped_at_start ? 'good' : 'bad'}"><b>return</b>${ind.stopped_at_start ? 'stops on the start vertex' : `stops on ${NAMES(t.stopped_at)}, not the start`}</span>` : '<span class="pill"><b>return</b>never stops, so never ends anywhere</span>';
+  const term = `<span class="pill ${ind.stopped ? 'good' : 'bad'}"><b>termination</b>${ind.stopped ? 'stops' : 'never stops'}</span>`;
+  return `<div class="pills" role="group" aria-label="the three parts of exploring">${cov}${ret}${term}</div>`;
+}
+function paperSummary(r) {
+  const t = r.trace, steps = t.steps.length, pills = analysisPills(r);
+  if (r.status === 'explores') return `<div class="banner good"><b>Explores against every adversary (paper model).</b> ${r.positions.toLocaleString()} positions enumerated, none losing: every vertex is visited and the agent stops on the start vertex ${NAMES(t.stopped_at)}. The adversary can delay the stop to step ${steps} at most; that longest obstruction is loaded below.</div>${pills}`;
+  const how = r.method === 'exact game' ? `Exact game over ${r.positions.toLocaleString()} positions: the adversary has a strategy under which` : `Found by an adversary ${r.method}: under it`;
+  const what = {
+    never_stops: `the agent never stops (the last ${steps - t.repeat_at} of the ${steps} steps repeat for ever)`,
+    stopped_early: `the agent stops on ${NAMES(t.stopped_at)} while <b>${t.unvisited.map(NAMES).join(', ')}</b> ${t.unvisited.length === 1 ? 'is' : 'are'} still unvisited`,
+    stopped_off_start: `the agent visits every vertex but stops on ${NAMES(t.stopped_at)}, not on the start vertex`,
+  }[r.reason];
+  return `<div class="banner bad"><b>Fails (paper model).</b> ${how} ${what}.</div>${pills}`;
+}
 function traceSummary(r) {
+  if (r.model === 'paper' && r.indicators) return paperSummary(r);
   const t = r.trace;
   if (r.status === 'explores') return `<div class="banner good"><b>Explores against every adversary.</b> ${r.positions.toLocaleString()} positions enumerated, none losing. The adversary can delay the last visit to step ${t.steps.length} at most; that longest obstruction is loaded below.</div>`;
   if (r.status === 'fails') return `<div class="banner bad"><b>Fails.</b> ${r.method === 'exact game' ? `Exact game over ${r.positions.toLocaleString()} positions: the adversary has a strategy that never visits <b>${t.unvisited.map(NAMES).join(', ')}</b>.` : `Found by an adversary ${r.method}: <b>${t.unvisited.map(NAMES).join(', ')}</b> never visited.`} The trapping execution has ${t.steps.length} steps, the last ${t.steps.length - t.repeat_at} repeating for ever.</div>`;
@@ -693,7 +713,7 @@ async function analyse(cmd) {
   if (r.status === 'error') s = `<div class="banner bad">${r.message}</div>`;
   else if (r.status === 'undefined') { s = `<div class="banner warn">The rule has no action for the row <span class="mono">${r.row}</span> ${bagChips(r.row)}, reached after ${r.path.steps.length} steps. Load the path to see the position and define the row in the Play tab.</div><div class="row"><button type="button" id="b-load-path">Load path</button></div>`; }
   else if (r.status === 'overflow') s = `<div class="banner warn">More than ${r.positions.toLocaleString()} positions: raise the cap (memory permitting) or try the walks.</div>`;
-  else if (r.status === 'unrefuted') s = `<div class="banner warn">All ${r.walks} adversary walks explored the graph. That is not a proof: run the exact game.</div>`;
+  else if (r.status === 'unrefuted') s = `<div class="banner warn">All ${r.walks} adversary walks ${r.model === 'paper' ? 'ended with every vertex visited and a stop on the start vertex' : 'explored the graph'}. That is not a proof: run the exact game.</div>`;
   else s = traceSummary(r) + `<div class="row"><button type="button" id="b-load-trace" class="primary">Load this execution into the player</button></div>`;
   out.innerHTML = s;
   const lt = $('#b-load-trace'); if (lt) lt.addEventListener('click', () => loadReplay(r.trace));
