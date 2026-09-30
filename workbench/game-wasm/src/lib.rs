@@ -859,7 +859,7 @@ pub fn walk(g: &Graph, rule: &Rule, heuristic: u8, seed: u64, budget: usize) -> 
     let mut seen: Map<Pos, usize> = Map::default();
     let mut steps: Vec<Step> = Vec::new();
     let mut rng = seed.max(1);
-    while steps.len() < budget {
+    loop {
         if rule.terminating {
             if p.term {
                 // the agent stopped: it explored only if that was on the start vertex with everything visited
@@ -869,6 +869,10 @@ pub fn walk(g: &Graph, rule: &Rule, heuristic: u8, seed: u64, budget: usize) -> 
                 return Ok(Some(Trace { steps, repeat_at: None, unvisited: full & !p.vis, stopped_at: Some(p.cur) }));
             }
         } else if p.vis == full {
+            return Ok(None);
+        }
+        // out of budget: decided only after the last position above was looked at
+        if steps.len() >= budget {
             return Ok(None);
         }
         if let Some(&s) = seen.get(&p) {
@@ -906,7 +910,6 @@ pub fn walk(g: &Graph, rule: &Rule, heuristic: u8, seed: u64, budget: usize) -> 
         steps.push(Step { cur: p.cur, row, act, options: opts, next: u });
         p = q;
     }
-    Ok(None)
 }
 
 pub fn walks(g: &Graph, rule: &Rule, random: usize, budget: usize) -> Outcome {
@@ -1518,6 +1521,24 @@ mod tests {
         for (mine, theirs) in lines.iter().zip(&fixture) {
             assert_eq!(mine, theirs);
         }
+    }
+
+    #[test]
+    fn a_walk_judges_the_position_it_ends_on_even_when_the_budget_runs_out() {
+        // the wrong stop (on vertex 1) is the position reached after exactly 2 actions
+        let g = Graph::parse("2 0 0-1").unwrap();
+        let wrong = paper_rule_from_table(2, &[("0.10", "1>0"), ("0.01", "0>stop")]);
+        for budget in [2, 3, 10] {
+            match walk(&g, &wrong, 0, 0, budget) {
+                Ok(Some(trace)) => assert_eq!(trace.stopped_at, Some(1), "budget {}", budget),
+                _ => panic!("budget {}: the wrong stop must be reported", budget),
+            }
+        }
+        // a correct stop on the last budgeted step is still an exploration
+        let good = paper_rule_from_table(2, &[("0.10", "1>0"), ("0.01", "0>1"), ("1.10", "1>stop")]);
+        assert!(matches!(walk(&g, &good, 0, 0, 3), Ok(None)));
+        // running out of budget before anything is decided is not a verdict
+        assert!(matches!(walk(&g, &good, 0, 0, 1), Ok(None)));
     }
 
     #[test]
