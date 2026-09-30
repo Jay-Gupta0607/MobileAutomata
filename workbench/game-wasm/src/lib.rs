@@ -253,6 +253,9 @@ pub enum Formula {
     Chase3,
     /// paint own colour, chase white, else stay: the engine's default for unlisted rows
     ChaseWhite,
+    /// A_Gen6 of Takahashi et al. (arXiv 2505.02789, Algorithm 2): six colours,
+    /// simulates a semi-DFS and stops on the start vertex
+    AGen6,
 }
 
 impl Formula {
@@ -267,6 +270,7 @@ impl Formula {
             "eat3" => Formula::Eat3,
             "chase3" => Formula::Chase3,
             "chasewhite" | "chase" => Formula::ChaseWhite,
+            "agen6" => Formula::AGen6,
             _ => {
                 let body = name.strip_prefix("sweep")?;
                 let body = body.trim_start_matches(['(', ':']).trim_end_matches(')');
@@ -508,6 +512,53 @@ impl Formula {
                     return Some(mv(S, W));
                 }
                 Some(if row.present(S) { mv(F, S) } else { first(row, F, &[F]) })
+            }
+            Formula::AGen6 => {
+                if k < 6 {
+                    return None;
+                }
+                // colours: 0 init, 1 path, 2 fin, 3 head1, 4 head2, 5 neigh.
+                // Within one own colour the first matching rule wins (the paper's rule numbers in comments).
+                const INIT: u8 = 0;
+                const PATH: u8 = 1;
+                const FIN: u8 = 2;
+                const HEAD1: u8 = 3;
+                const HEAD2: u8 = 4;
+                const NEIGH: u8 = 5;
+                Some(match row.own {
+                    INIT => {
+                        if row.present(PATH) {
+                            mv(NEIGH, HEAD1) // rule 1
+                        } else if row.present(HEAD1) {
+                            mv(HEAD1, HEAD1) // rule 2
+                        } else {
+                            mv(HEAD1, STAY) // rule 3
+                        }
+                    }
+                    HEAD1 => {
+                        if row.present(INIT) && !row.present(HEAD1) {
+                            mv(HEAD1, INIT) // rule 4
+                        } else {
+                            mv(HEAD2, STAY) // rule 5
+                        }
+                    }
+                    HEAD2 => {
+                        if row.present(NEIGH) {
+                            mv(HEAD2, NEIGH) // rule 6
+                        } else if row.present(HEAD1) {
+                            mv(PATH, HEAD1) // rule 7
+                        } else if row.present(PATH) {
+                            mv(FIN, PATH) // rule 8
+                        } else {
+                            mv(FIN, STOP) // rule 9
+                        }
+                    }
+                    PATH => mv(HEAD1, STAY), // rule 10
+                    NEIGH => mv(INIT, HEAD2), // rule 11
+                    // FIN: the paper defines no rule, the agent is on a fin vertex only after it has stopped
+                    FIN => return None,
+                    _ => return None,
+                })
             }
         }
     }
@@ -1120,6 +1171,105 @@ mod tests {
         assert!(out.contains("\"defined\":true") && out.contains("\"paint\":2") && out.contains("\"target\":-2"), "{}", out);
         // the adversary is never offered a move for stop
         assert!(options(&Graph::parse("2 0 0-1").unwrap(), 0, 0, STOP).is_empty());
+    }
+
+    // (row read, action taken) at each step, from workbench/notes/agen6-hand-trace.xlsx
+    const PATH_TRACE: [(&str, &str); 17] = [
+        ("0.100000", "3>stay"), ("3.100000", "3>0"), ("0.100100", "3>3"), ("3.000100", "4>stay"),
+        ("4.000100", "1>3"), ("3.110000", "3>0"), ("0.000100", "3>3"), ("3.010100", "4>stay"),
+        ("4.010100", "1>3"), ("3.010000", "4>stay"), ("4.010000", "2>1"), ("1.011000", "3>stay"),
+        ("3.011000", "4>stay"), ("4.011000", "2>1"), ("1.001000", "3>stay"), ("3.001000", "4>stay"),
+        ("4.001000", "2>stop"),
+    ];
+
+    // (row read, action taken) at each step, from workbench/notes/agen6-hand-trace.xlsx
+    const TRIANGLE_TRACE: [(&str, &str); 21] = [
+        ("0.200000", "3>stay"), ("3.200000", "3>0"), ("0.100100", "3>3"), ("3.100100", "4>stay"),
+        ("4.100100", "1>3"), ("3.110000", "3>0"), ("0.010100", "5>3"), ("3.010001", "4>stay"),
+        ("4.010001", "4>5"), ("5.010010", "0>4"), ("4.110000", "2>1"), ("1.101000", "3>stay"),
+        ("3.101000", "3>0"), ("0.001100", "3>3"), ("3.001100", "4>stay"), ("4.001100", "1>3"),
+        ("3.011000", "4>stay"), ("4.011000", "2>1"), ("1.002000", "3>stay"), ("3.002000", "4>stay"),
+        ("4.002000", "2>stop"),
+    ];
+
+    // (row read, action taken) at each step, from workbench/notes/agen6-hand-trace.xlsx
+    const TREE_TRACE: [(&str, &str); 24] = [
+        ("0.200000", "3>stay"), ("3.200000", "3>0"), ("0.100100", "3>3"), ("3.100100", "4>stay"),
+        ("4.100100", "1>3"), ("3.110000", "3>0"), ("0.000100", "3>3"), ("3.010100", "4>stay"),
+        ("4.010100", "1>3"), ("3.010000", "4>stay"), ("4.010000", "2>1"), ("1.011000", "3>stay"),
+        ("3.011000", "4>stay"), ("4.011000", "2>1"), ("1.101000", "3>stay"), ("3.101000", "3>0"),
+        ("0.000100", "3>3"), ("3.001100", "4>stay"), ("4.001100", "1>3"), ("3.010000", "4>stay"),
+        ("4.010000", "2>1"), ("1.002000", "3>stay"), ("3.002000", "4>stay"), ("4.002000", "2>stop"),
+    ];
+
+    /// Runs A_Gen6 the way the paper's model says, one action at a time, and
+    /// returns the (row, action) log, the final colouring and the final vertex.
+    /// `pref` lists the vertices in the adversary's order of preference.
+    fn run_agen6(g: &Graph, pref: &[u8]) -> (Vec<(String, String)>, u128, u8) {
+        let f = Formula::AGen6;
+        let (mut chi, mut cur) = (0u128, g.s);
+        let mut log = Vec::new();
+        for _ in 0..1000 {
+            let row = row_at(g, chi, cur);
+            let act = f.action(&row, 6).expect("A_Gen6 has no rule for this row");
+            log.push((row.text(6), act.text()));
+            let opts = options(g, chi, cur, act.target);
+            chi = paint(chi, cur, act.paint);
+            if act.target == STOP {
+                return (log, chi, cur);
+            }
+            if act.target != STAY {
+                assert!(!opts.is_empty(), "A_Gen6 targeted a colour no neighbour has");
+                cur = *opts.iter().min_by_key(|u| pref.iter().position(|p| p == *u).unwrap()).unwrap();
+            }
+        }
+        panic!("A_Gen6 did not stop");
+    }
+
+    fn all_fin_at_start(g: &Graph, chi: u128, cur: u8) {
+        assert_eq!(cur, g.s, "must stop on the start vertex");
+        for v in 0..g.n {
+            assert_eq!(colour(chi, v), 2, "vertex {} is not fin", v);
+        }
+    }
+
+    fn check_trace(g: &Graph, pref: &[u8], expected: &[(&str, &str)]) {
+        let (log, chi, cur) = run_agen6(g, pref);
+        let got: Vec<(&str, &str)> = log.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
+        assert_eq!(got, expected);
+        all_fin_at_start(g, chi, cur);
+    }
+
+    #[test]
+    fn agen6_reproduces_the_hand_traces() {
+        check_trace(&Graph::parse("3 0 0-1,1-2").unwrap(), &[0, 1, 2], &PATH_TRACE);
+        check_trace(&Graph::parse("3 0 0-1,1-2,0-2").unwrap(), &[0, 1, 2], &TRIANGLE_TRACE);
+        check_trace(&Graph::parse("4 0 0-1,0-2,1-3").unwrap(), &[1, 2, 3, 0], &TREE_TRACE);
+    }
+
+    #[test]
+    fn agen6_finishes_the_tree_under_the_other_tie_choice() {
+        let g = Graph::parse("4 0 0-1,0-2,1-3").unwrap();
+        let (log, chi, cur) = run_agen6(&g, &[2, 1, 3, 0]);
+        assert_eq!(log.len(), 24);
+        all_fin_at_start(&g, chi, cur);
+    }
+
+    #[test]
+    fn agen6_rules_priority_and_gaps() {
+        let ans = |k: u8, row: &str| handle(&format!("cmd answer\nk {}\nrow {}\ndefault agen6\n", k, row));
+        // rule 3 (start vertex), rule 1 before rule 2, rule 4 and 5, rule 9
+        assert!(ans(6, "0.100000").contains("\"paint\":3,\"target\":-1"));
+        assert!(ans(6, "0.010100").contains("\"paint\":5,\"target\":3"));
+        assert!(ans(6, "3.100000").contains("\"paint\":3,\"target\":0"));
+        assert!(ans(6, "3.110100").contains("\"paint\":4,\"target\":-1"));
+        assert!(ans(6, "4.001000").contains("\"paint\":2,\"target\":-2"));
+        // rule 6 before rule 7 before rule 8
+        assert!(ans(6, "4.010101").contains("\"paint\":4,\"target\":5"));
+        assert!(ans(6, "4.010100").contains("\"paint\":1,\"target\":3"));
+        // the paper defines no rule for fin, and A_Gen6 needs six colours
+        assert!(ans(6, "2.000000").contains("\"defined\":false"));
+        assert!(ans(5, "0.10000").contains("\"defined\":false"));
     }
 
     #[test]
