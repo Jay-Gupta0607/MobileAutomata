@@ -965,15 +965,38 @@ fn trace_json(t: &Trace, k: u8) -> String {
         .iter()
         .map(|s| format!("{{\"cur\":{},\"row\":{},\"paint\":{},\"target\":{},\"options\":{},\"next\":{}}}", s.cur, js(&s.row.text(k)), s.act.paint, target_json(s.act.target), list(&s.options), s.next.map_or("null".to_string(), |u| u.to_string())))
         .collect();
-    format!("{{\"repeat_at\":{},\"unvisited\":{},\"steps\":[{}]}}", t.repeat_at.map_or("null".to_string(), |r| r.to_string()), mask_list(t.unvisited), steps.join(","))
+    format!("{{\"repeat_at\":{},\"unvisited\":{},\"stopped_at\":{},\"steps\":[{}]}}", t.repeat_at.map_or("null".to_string(), |r| r.to_string()), mask_list(t.unvisited), t.stopped_at.map_or("null".to_string(), |v| v.to_string()), steps.join(","))
 }
-fn outcome_json(o: &Outcome, k: u8) -> String {
+/// Why a play ended badly in the paper model.
+fn fail_reason(t: &Trace, start: u8) -> &'static str {
+    match t.stopped_at {
+        None => "never_stops",
+        Some(_) if t.unvisited != 0 => "stopped_early",
+        Some(v) if v != start => "stopped_off_start",
+        Some(_) => "stopped_on_start",
+    }
+}
+/// Paper model: the three parts of exploring, reported separately.
+fn indicators(t: &Trace, start: u8) -> String {
+    format!("{{\"visited_all\":{},\"stopped\":{},\"stopped_at_start\":{}}}", t.unvisited == 0, t.stopped_at.is_some(), t.stopped_at == Some(start))
+}
+/// `paper`: the outcome is for the paper's model, which adds `model`, and for a trace also
+/// `indicators` and (for a failure) `reason`.
+fn outcome_json(o: &Outcome, k: u8, paper: bool, start: u8) -> String {
+    let model = format!("\"model\":\"{}\"", if paper { "paper" } else { "classic" });
+    let extra = |t: &Trace, fails: bool| -> String {
+        if !paper {
+            return String::new();
+        }
+        let reason = if fails { format!(",\"reason\":\"{}\"", fail_reason(t, start)) } else { String::new() };
+        format!(",\"indicators\":{}{}", indicators(t, start), reason)
+    };
     match o {
-        Outcome::Explores { positions, trace } => format!("{{\"status\":\"explores\",\"positions\":{},\"trace\":{}}}", positions, trace_json(trace, k)),
-        Outcome::Fails { positions, method, trace } => format!("{{\"status\":\"fails\",\"positions\":{},\"method\":{},\"trace\":{}}}", positions, js(method), trace_json(trace, k)),
-        Outcome::Undefined { row, path } => format!("{{\"status\":\"undefined\",\"row\":{},\"path\":{}}}", js(&row.text(k)), trace_json(path, k)),
-        Outcome::Overflow { positions } => format!("{{\"status\":\"overflow\",\"positions\":{}}}", positions),
-        Outcome::Unrefuted { walks } => format!("{{\"status\":\"unrefuted\",\"walks\":{}}}", walks),
+        Outcome::Explores { positions, trace } => format!("{{\"status\":\"explores\",{},\"positions\":{}{},\"trace\":{}}}", model, positions, extra(trace, false), trace_json(trace, k)),
+        Outcome::Fails { positions, method, trace } => format!("{{\"status\":\"fails\",{},\"positions\":{},\"method\":{}{},\"trace\":{}}}", model, positions, js(method), extra(trace, true), trace_json(trace, k)),
+        Outcome::Undefined { row, path } => format!("{{\"status\":\"undefined\",{},\"row\":{},\"path\":{}}}", model, js(&row.text(k)), trace_json(path, k)),
+        Outcome::Overflow { positions } => format!("{{\"status\":\"overflow\",{},\"positions\":{}}}", model, positions),
+        Outcome::Unrefuted { walks } => format!("{{\"status\":\"unrefuted\",{},\"walks\":{}}}", model, walks),
     }
 }
 fn err(msg: &str) -> String {
@@ -1135,9 +1158,9 @@ pub fn handle(input: &str) -> String {
         }
         "exact" => {
             let cap = r.cap.clamp(1_000, 12_000_000);
-            outcome_json(&exact_game(&g, &rule, cap), r.k)
+            outcome_json(&exact_game(&g, &rule, cap), r.k, rule.terminating, g.s)
         }
-        "walks" => outcome_json(&walks(&g, &rule, r.walks.min(100_000), r.budget.clamp(10, 5_000_000)), r.k),
+        "walks" => outcome_json(&walks(&g, &rule, r.walks.min(100_000), r.budget.clamp(10, 5_000_000)), r.k, rule.terminating, g.s),
         other => err(&format!("unknown cmd {}", other)),
     }
 }
@@ -1433,6 +1456,31 @@ mod tests {
         assert!(matches!(walks(&g, &sigma, 2, 10_000), Outcome::Unrefuted { .. }), "classic: it visits everything");
         sigma.terminating = true;
         assert!(matches!(walks(&g, &sigma, 2, 10_000), Outcome::Fails { .. }), "paper model: it never stops");
+    }
+
+    #[test]
+    fn results_report_the_paper_conditions_separately() {
+        // A_Gen6 explores: stopped on the start, everything visited
+        let out = handle("cmd exact\nk 6\ngraph 3 0 0-1,1-2\ndefault agen6\n");
+        assert!(out.contains("\"status\":\"explores\"") && out.contains("\"model\":\"paper\""), "{}", out);
+        assert!(out.contains("\"indicators\":{\"visited_all\":true,\"stopped\":true,\"stopped_at_start\":true}"), "{}", out);
+        assert!(out.contains("\"stopped_at\":0"), "{}", out);
+        // visits everything but stops on the wrong vertex
+        let off = handle("cmd exact\nk 2\nmodel paper\ngraph 2 0 0-1\ntable\n0.10 1>0\n0.01 0>stop\nend\n");
+        assert!(off.contains("\"reason\":\"stopped_off_start\""), "{}", off);
+        assert!(off.contains("\"indicators\":{\"visited_all\":true,\"stopped\":true,\"stopped_at_start\":false}"), "{}", off);
+        // stops before visiting everything
+        let early = handle("cmd exact\nk 2\nmodel paper\ngraph 2 0 0-1\ntable\n0.10 1>stop\nend\n");
+        assert!(early.contains("\"reason\":\"stopped_early\"") && early.contains("\"visited_all\":false"), "{}", early);
+        // never stops
+        let never = handle("cmd exact\nk 5\nmodel paper\ngraph 4 0 0-1,1-2,2-3\ndefault sigma\n");
+        assert!(never.contains("\"reason\":\"never_stops\"") && never.contains("\"stopped\":false"), "{}", never);
+        // a walk reports the same way
+        let walk = handle("cmd walks\nk 2\nmodel paper\ngraph 2 0 0-1\ntable\n0.10 1>0\n0.01 0>stop\nend\n");
+        assert!(walk.contains("\"reason\":\"stopped_off_start\""), "{}", walk);
+        // the classic answer keeps its shape: no indicators, no reason
+        let classic = handle("cmd exact\nk 5\ngraph 4 0 0-1,1-2,2-3\ndefault sigma\n");
+        assert!(classic.contains("\"model\":\"classic\"") && !classic.contains("indicators") && !classic.contains("reason"), "{}", classic);
     }
 
     #[test]
