@@ -265,6 +265,61 @@ pub enum Formula {
 }
 
 impl Formula {
+    /// A_Gen6 (Algorithm 2 of Takahashi et al.): the action on `row` and the number of the paper's rule
+    /// that gave it; `None` for a fin vertex, for which the paper defines no rule (the agent is on a fin
+    /// vertex only after it has stopped).  Within one own colour the first matching rule wins.
+    /// Colours: 0 init, 1 path, 2 fin, 3 head1, 4 head2, 5 neigh.
+    fn agen6(row: &Row) -> Option<(Action, u8)> {
+        const INIT: u8 = 0;
+        const PATH: u8 = 1;
+        const FIN: u8 = 2;
+        const HEAD1: u8 = 3;
+        const HEAD2: u8 = 4;
+        const NEIGH: u8 = 5;
+        let mv = |paint: u8, target: u8| Action { paint, target };
+        Some(match row.own {
+            INIT => {
+                if row.present(PATH) {
+                    (mv(NEIGH, HEAD1), 1)
+                } else if row.present(HEAD1) {
+                    (mv(HEAD1, HEAD1), 2)
+                } else {
+                    (mv(HEAD1, STAY), 3)
+                }
+            }
+            HEAD1 => {
+                if row.present(INIT) && !row.present(HEAD1) {
+                    (mv(HEAD1, INIT), 4)
+                } else {
+                    (mv(HEAD2, STAY), 5)
+                }
+            }
+            HEAD2 => {
+                if row.present(NEIGH) {
+                    (mv(HEAD2, NEIGH), 6)
+                } else if row.present(HEAD1) {
+                    (mv(PATH, HEAD1), 7)
+                } else if row.present(PATH) {
+                    (mv(FIN, PATH), 8)
+                } else {
+                    (mv(FIN, STOP), 9)
+                }
+            }
+            PATH => (mv(HEAD1, STAY), 10),
+            NEIGH => (mv(INIT, HEAD2), 11),
+            _ => return None,
+        })
+    }
+
+    /// The number of the paper's rule that answers `row`, for the formulas that have numbered rules
+    /// (A_Gen6 only).
+    pub fn rule_number(&self, row: &Row, k: u8) -> Option<u8> {
+        match self {
+            Formula::AGen6 if k >= 6 => Formula::agen6(row).map(|(_, n)| n),
+            _ => None,
+        }
+    }
+
     pub fn parse(name: &str) -> Option<Formula> {
         let name = name.trim();
         Some(match name {
@@ -523,47 +578,7 @@ impl Formula {
                 if k < 6 {
                     return None;
                 }
-                // colours: 0 init, 1 path, 2 fin, 3 head1, 4 head2, 5 neigh.
-                // Within one own colour the first matching rule wins (the paper's rule numbers in comments).
-                const INIT: u8 = 0;
-                const PATH: u8 = 1;
-                const FIN: u8 = 2;
-                const HEAD1: u8 = 3;
-                const HEAD2: u8 = 4;
-                const NEIGH: u8 = 5;
-                Some(match row.own {
-                    INIT => {
-                        if row.present(PATH) {
-                            mv(NEIGH, HEAD1) // rule 1
-                        } else if row.present(HEAD1) {
-                            mv(HEAD1, HEAD1) // rule 2
-                        } else {
-                            mv(HEAD1, STAY) // rule 3
-                        }
-                    }
-                    HEAD1 => {
-                        if row.present(INIT) && !row.present(HEAD1) {
-                            mv(HEAD1, INIT) // rule 4
-                        } else {
-                            mv(HEAD2, STAY) // rule 5
-                        }
-                    }
-                    HEAD2 => {
-                        if row.present(NEIGH) {
-                            mv(HEAD2, NEIGH) // rule 6
-                        } else if row.present(HEAD1) {
-                            mv(PATH, HEAD1) // rule 7
-                        } else if row.present(PATH) {
-                            mv(FIN, PATH) // rule 8
-                        } else {
-                            mv(FIN, STOP) // rule 9
-                        }
-                    }
-                    PATH => mv(HEAD1, STAY), // rule 10
-                    NEIGH => mv(INIT, HEAD2), // rule 11
-                    // FIN: the paper defines no rule, the agent is on a fin vertex only after it has stopped
-                    _ => return None,
-                })
+                Formula::agen6(row).map(|(a, _)| a)
             }
         }
     }
@@ -603,6 +618,15 @@ impl Rule {
             p.term && p.cur == g.s && p.vis == g.full()
         } else {
             p.vis == g.full()
+        }
+    }
+    /// The paper's rule number behind a default answer (`None` when a table row answers, or the default
+    /// formula has no numbered rules).
+    pub fn rule_number(&self, row: &Row) -> Option<u8> {
+        if self.table.contains_key(row) {
+            None
+        } else {
+            self.default.and_then(|f| f.rule_number(row, self.k))
         }
     }
     pub fn answer(&self, row: &Row) -> Answer {
@@ -1012,6 +1036,11 @@ fn target_json(t: u8) -> String {
         t.to_string()
     }
 }
+/// `,"rule":N` for an answer that comes from a numbered rule of the paper, else nothing (so the answers
+/// of the other rules keep their shape).
+fn rule_json(rule: Option<u8>) -> String {
+    rule.map_or(String::new(), |n| format!(",\"rule\":{}", n))
+}
 fn trace_json(t: &Trace, k: u8) -> String {
     let steps: Vec<String> = t
         .steps
@@ -1198,7 +1227,7 @@ pub fn handle(input: &str) -> String {
         let Some(text) = r.row.as_deref().and_then(Row::parse) else { return err("row: expected own.bag") };
         return match rule.answer(&text) {
             Answer::Table(a) => format!("{{\"status\":\"ok\",\"defined\":true,\"source\":\"table\",\"paint\":{},\"target\":{}}}", a.paint, target_json(a.target)),
-            Answer::Default(a) => format!("{{\"status\":\"ok\",\"defined\":true,\"source\":\"default\",\"paint\":{},\"target\":{}}}", a.paint, target_json(a.target)),
+            Answer::Default(a) => format!("{{\"status\":\"ok\",\"defined\":true,\"source\":\"default\",\"paint\":{},\"target\":{}{}}}", a.paint, target_json(a.target), rule_json(rule.rule_number(&text))),
             Answer::Undefined => "{\"status\":\"ok\",\"defined\":false}".to_string(),
         };
     }
@@ -1232,7 +1261,7 @@ pub fn handle(input: &str) -> String {
             };
             let opts = options(&g, chi, cur, a.target);
             let auto = auto_choice(&g, vis, &opts);
-            format!("{{\"status\":\"ok\",\"row\":{},\"degree\":{},\"defined\":true,\"source\":\"{}\",\"paint\":{},\"target\":{},\"options\":{},\"auto\":{},\"explored\":{}}}", js(&row.text(r.k)), row.degree(), source, a.paint, target_json(a.target), list(&opts), auto.map_or("null".to_string(), |u| u.to_string()), vis == g.full())
+            format!("{{\"status\":\"ok\",\"row\":{},\"degree\":{},\"defined\":true,\"source\":\"{}\",\"paint\":{},\"target\":{},\"options\":{},\"auto\":{},\"explored\":{}{}}}", js(&row.text(r.k)), row.degree(), source, a.paint, target_json(a.target), list(&opts), auto.map_or("null".to_string(), |u| u.to_string()), vis == g.full(), rule_json(rule.rule_number(&row)))
         }
         "exact" => {
             let cap = r.cap.clamp(1_000, 12_000_000);
@@ -1597,7 +1626,7 @@ mod tests {
             for cnt in &all {
                 let row = Row { own, cnt: *cnt };
                 lines.push(match Formula::AGen6.action(&row, 6) {
-                    Some(a) => format!("{} {}", row.text(6), a.text()),
+                    Some(a) => format!("{} {} r{}", row.text(6), a.text(), Formula::AGen6.rule_number(&row, 6).unwrap()),
                     None => format!("{} undefined", row.text(6)),
                 });
             }
@@ -1801,6 +1830,33 @@ mod tests {
         assert!(Graph::parse("3 0 0-1,1-2,0-2").is_ok());
         assert!(Graph::parse("1 0").is_ok());
         assert!(handle("cmd exact\nk 2\ngraph 2 0 0-1\ntable\n0.10 1>0\n0.01 0>1\n1.10 1>stop\nend\n").contains("\"status\":\"explores\""));
+    }
+
+    const PATH_RULES: [u8; 17] = [3, 4, 2, 5, 7, 4, 2, 5, 7, 5, 8, 10, 5, 8, 10, 5, 9];
+    const TRIANGLE_RULES: [u8; 21] = [3, 4, 2, 5, 7, 4, 1, 5, 6, 11, 8, 10, 4, 2, 5, 7, 5, 8, 10, 5, 9];
+    const TREE_RULES: [u8; 24] = [3, 4, 2, 5, 7, 4, 2, 5, 7, 5, 8, 10, 5, 8, 10, 4, 2, 5, 7, 5, 8, 10, 5, 9];
+
+    #[test]
+    fn agen6_reports_the_rule_number_of_the_paper() {
+        // the rule numbers the hand traces record (the "Rule followed" column of the workbook), row by row
+        for (trace, rules) in [(&PATH_TRACE[..], &PATH_RULES[..]), (&TRIANGLE_TRACE[..], &TRIANGLE_RULES[..]), (&TREE_TRACE[..], &TREE_RULES[..])] {
+            for (i, ((row, _), want)) in trace.iter().zip(rules).enumerate() {
+                let row = Row::parse(row).unwrap();
+                assert_eq!(Formula::AGen6.rule_number(&row, 6), Some(*want), "step {} of a hand trace", i);
+            }
+        }
+        // no rule for fin, none for other formulas, none below six colours
+        assert_eq!(Formula::AGen6.rule_number(&Row::parse("2.000001").unwrap(), 6), None);
+        assert_eq!(Formula::parse("sigma").unwrap().rule_number(&Row::parse("0.10000").unwrap(), 5), None);
+        assert_eq!(Formula::AGen6.rule_number(&Row::parse("0.100000").unwrap(), 5), None);
+        // through the protocol: a default answer names its rule, a table row and other rules do not
+        let step = handle("cmd step\nk 6\ngraph 4 0 0-1,0-2,1-3\ncolours 3 0 0 0\ncur 0\nvis 0\ndefault agen6\n");
+        assert!(step.contains("\"row\":\"3.200000\"") && step.contains("\"source\":\"default\"") && step.contains("\"rule\":4"), "{}", step);
+        let ans = handle("cmd answer\nk 6\nrow 4.001000\ndefault agen6\n");
+        assert!(ans.contains("\"rule\":9"), "{}", ans);
+        let table = handle("cmd answer\nk 6\nrow 4.001000\ndefault agen6\ntable\n4.001000 2>stop\nend\n");
+        assert!(table.contains("\"source\":\"table\"") && !table.contains("\"rule\""), "{}", table);
+        assert!(!handle("cmd answer\nk 5\nrow 0.10000\ndefault sigma\n").contains("\"rule\""));
     }
 
     #[test]

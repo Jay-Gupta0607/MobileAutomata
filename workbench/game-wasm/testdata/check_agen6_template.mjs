@@ -23,7 +23,7 @@ const rec = (c, left, own) => {
       const bag = cnt.slice(), has = (x) => Number.isInteger(x) && x >= 0 && x < k && bag[x] > 0;
       const out = f(own, bag, k, bag.reduce((a, b) => a + b, 0), has, nxt, prv, 0);
       const row = own + '.' + cnt.map((x) => x.toString(16)).join('');
-      lines.push(out === null ? `${row} undefined` : `${row} ${out.paint}>${out.target}`);
+      lines.push(out === null ? `${row} undefined` : `${row} ${out.paint}>${out.target} r${out.rule}`);
     }
     return;
   }
