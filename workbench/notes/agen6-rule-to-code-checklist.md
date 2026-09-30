@@ -4,7 +4,7 @@ Source: Takahashi, Kanaya, Hiraoka, Eguchi, Sudo, *Recolorable Graph Exploration
 
 Engine: `workbench/game-wasm/src/lib.rs` (Rust, compiled to Wasm) and `workbench/site/index.html` (page, algorithm editor).
 
-Status: draft, written before any engine change. Updated: D3 decided (keep absent target means stay; the `y ∉ M` termination clause is deferred). Hand traces are in `agen6-hand-trace.xlsx` (path, triangle, tree).
+Status: **E1 to E8 are implemented** on branch `feature/a-gen6` (one commit each; the engine tests and the page-template agreement check pass). Written as a plan before any engine change; D3 decided (keep absent target means stay; the `y ∉ M` termination clause is deferred). Follow-up fixes after review: a walk judges its last position even when the budget runs out; a rule that can `stop` is judged by the paper model when no `model` is given; the numbers 254 and 255 are no longer colour targets; `agen6` with fewer than six colours is an error. Still open: the page's Play tab and indicators, and rebuilding `site/game.wasm` / `docs/index.html` (Stage 3). Hand traces are in `agen6-hand-trace.xlsx` (path, triangle, tree).
 
 ---
 
@@ -81,7 +81,7 @@ if (own === 5) return { paint: 0, target: 4 };       // Rule 11
 // own === 2 (fin): no rule
 ```
 
-## 4. Engine changes needed (Stage 1)
+## 4. Engine changes (Stage 1), all done: E1 to E8
 
 Each item lists where (function or type names in the current `lib.rs` and `index.html`) and why.
 
