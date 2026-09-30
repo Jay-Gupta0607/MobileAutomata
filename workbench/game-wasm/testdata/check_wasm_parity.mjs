@@ -40,6 +40,23 @@ for (const name of names) {
 }
 if (names.length < 20) { console.log(`only ${names.length} fixtures found`); bad++; }
 
+// the page's own presets that bring A_Gen6 must explore in this engine, and have a position for every vertex
+{
+  const page = readFileSync(join(workbench, 'site', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
+  const a = page.indexOf('const PRESETS = {'), b = page.indexOf('\n', page.indexOf('PRESETS.agen6sketch1'));
+  const PRESETS = new Function(page.slice(a, b) + '\nreturn PRESETS;')();
+  let n = 0;
+  for (const [name, pr] of Object.entries(PRESETS).filter(([, p]) => p.def === 'agen6')) {
+    const nodes = +pr.text.split(/\s+/)[0];
+    const got = JSON.parse(run(`cmd exact\nk ${pr.k}\ngraph ${pr.text}\ndefault agen6\ncap 2000000\n`));
+    const ok = got.status === 'explores' && got.trace.stopped_at === +pr.text.split(/\s+/)[1] && (!pr.coords || pr.coords.length === nodes);
+    if (ok) console.log(`ok    preset ${name} explores (${got.positions} positions)`);
+    else { bad++; console.log(`FAIL  preset ${name}: ${got.status}, ${pr.coords ? pr.coords.length : 'no'} coordinates for ${nodes} vertices`); }
+    n++;
+  }
+  if (n < 4) { bad++; console.log(`only ${n} A_Gen6 presets found`); }
+}
+
 // the Pages file must embed exactly this build
 const b64 = wasmBytes.toString('base64');
 const docs = readFileSync(join(workbench, '..', 'docs', 'index.html'), 'utf8');
