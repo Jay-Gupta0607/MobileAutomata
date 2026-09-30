@@ -860,7 +860,15 @@ pub fn walk(g: &Graph, rule: &Rule, heuristic: u8, seed: u64, budget: usize) -> 
     let mut steps: Vec<Step> = Vec::new();
     let mut rng = seed.max(1);
     while steps.len() < budget {
-        if p.term || p.vis == full {
+        if rule.terminating {
+            if p.term {
+                // the agent stopped: it explored only if that was on the start vertex with everything visited
+                if p.cur == g.s && p.vis == full {
+                    return Ok(None);
+                }
+                return Ok(Some(Trace { steps, repeat_at: None, unvisited: full & !p.vis, stopped_at: Some(p.cur) }));
+            }
+        } else if p.vis == full {
             return Ok(None);
         }
         if let Some(&s) = seen.get(&p) {
@@ -1400,6 +1408,31 @@ mod tests {
             }
             _ => panic!("visiting everything and stopping on the start must explore"),
         }
+    }
+
+    #[test]
+    fn walks_use_the_paper_win_condition_too() {
+        let a6 = Rule { k: 6, table: Map::default(), default: Some(Formula::AGen6), terminating: true };
+        for (n, edges) in [(3u8, "0-1,1-2"), (3, "0-1,1-2,0-2"), (4, "0-1,0-2,1-3")] {
+            let g = Graph::parse(&format!("{} 0 {}", n, edges)).unwrap();
+            assert!(matches!(walks(&g, &a6, 8, 10_000), Outcome::Unrefuted { .. }), "A_Gen6 survives every walk on {}", edges);
+        }
+        // a stop away from the start is caught by a walk
+        let g = Graph::parse("2 0 0-1").unwrap();
+        let wrong = paper_rule_from_table(2, &[("0.10", "1>0"), ("0.01", "0>stop")]);
+        match walks(&g, &wrong, 2, 1000) {
+            Outcome::Fails { trace, .. } => {
+                assert_eq!(trace.stopped_at, Some(1));
+                assert_eq!(trace.repeat_at, None);
+            }
+            _ => panic!("the walk must see the stop on vertex 1"),
+        }
+        // a rule that never stops is caught by a repeat
+        let g = Graph::parse("4 0 0-1,1-2,2-3").unwrap();
+        let mut sigma = rule(5, "sigma");
+        assert!(matches!(walks(&g, &sigma, 2, 10_000), Outcome::Unrefuted { .. }), "classic: it visits everything");
+        sigma.terminating = true;
+        assert!(matches!(walks(&g, &sigma, 2, 10_000), Outcome::Fails { .. }), "paper model: it never stops");
     }
 
     #[test]
