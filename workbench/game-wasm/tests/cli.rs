@@ -294,3 +294,19 @@ fn a_line_break_in_an_option_cannot_add_request_lines() {
     assert_eq!(code(&ok), 0);
     assert!(stdout(&ok).lines().any(|l| l == "default sweep(0,4,0)"), "{}", stdout(&ok));
 }
+
+#[test]
+fn a_request_file_takes_no_other_request_options() {
+    let f = Temp::new("alone.req", "cmd exact\nk 6\ngraph 3 0 0-1,1-2\ndefault agen6\n");
+    let table = Temp::new("alone-table.txt", "0.10 1>0\n");
+    for extra in [&["--cap", "5000"][..], &["--rule", "sigma"], &["--graph", "3 0 0-1,1-2"], &["--k", "6"], &["--model", "classic"], &["--table", table.path()], &["--walks", "3"], &["--budget", "50"], &["--prefer", "1"], &["--row", "0.1"]] {
+        let mut args = vec!["--request-file", f.path()];
+        args.extend_from_slice(extra);
+        let o = run(&args);
+        assert_eq!(code(&o), 64, "{:?}: {}", extra, stdout(&o));
+        assert!(stderr(&o).contains("--request-file is used alone"), "{:?}: {}", extra, stderr(&o));
+    }
+    // the options about output still go with it
+    assert_eq!(code(&run(&["--request-file", f.path(), "--summary"])), 0);
+    assert!(stdout(&run(&["--request-file", f.path(), "--request"])).contains("default agen6"));
+}

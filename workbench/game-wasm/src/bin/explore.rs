@@ -141,7 +141,9 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
         i += 1;
     }
     if a.request_file.is_some() {
-        return if a.command.is_empty() { Ok(a) } else { Err("--request-file is used alone: the file holds the whole request".into()) };
+        // the file is sent as written, so an option that would change the request would be ignored without a word
+        let others = a.graph.is_some() || a.rule.is_some() || a.table.is_some() || a.k.is_some() || a.model.is_some() || a.cap.is_some() || a.walks.is_some() || a.budget.is_some() || a.prefer.is_some() || a.row.is_some();
+        return if a.command.is_empty() && !others { Ok(a) } else { Err("--request-file is used alone: the file holds the whole request (only --summary and --request go with it)".into()) };
     }
     match a.command.as_str() {
         "exact" | "walks" | "play" | "answer" => Ok(a),
