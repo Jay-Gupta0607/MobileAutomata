@@ -25,6 +25,11 @@ impl Temp {
         std::fs::write(&path, text).unwrap();
         Temp(path)
     }
+    fn bytes(name: &str, bytes: &[u8]) -> Temp {
+        let path = std::env::temp_dir().join(format!("explore-test-{}-{}", std::process::id(), name));
+        std::fs::write(&path, bytes).unwrap();
+        Temp(path)
+    }
     fn path(&self) -> &str {
         self.0.to_str().unwrap()
     }
@@ -173,4 +178,27 @@ fn prefer_must_be_vertex_numbers() {
     // commas work as separators, a vertex outside the graph is still an error
     assert_eq!(code(&run(&["play", "--graph", TREE, "--rule", "agen6", "--prefer", "1,2,3,0"])), 0);
     assert_eq!(code(&run(&["play", "--graph", TREE, "--rule", "agen6", "--prefer", "1,9"])), 64);
+}
+
+#[test]
+fn files_written_by_windows_tools_are_read_or_explained() {
+    let bom = |text: &str| -> Vec<u8> { [&[0xEF, 0xBB, 0xBF][..], text.as_bytes()].concat() };
+    // UTF-8 with a byte order mark (Notepad, `Out-File -Encoding utf8`) works for all three file options
+    let g = Temp::bytes("bom-graph.txt", &bom("4 0 0-1,0-2,1-3"));
+    assert_eq!(code(&run(&["exact", "--graph-file", g.path(), "--rule", "agen6"])), 0);
+    let t = Temp::bytes("bom-table.txt", &bom("0.10 1>0\n0.01 0>1\n1.10 1>stop\n"));
+    assert_eq!(code(&run(&["exact", "--graph", "2 0 0-1", "--k", "2", "--table", t.path()])), 0);
+    let r = Temp::bytes("bom.req", &bom("cmd exact\nk 6\ngraph 3 0 0-1,1-2\ndefault agen6\n"));
+    assert_eq!(code(&run(&["--request-file", r.path()])), 0);
+    // UTF-16 (Windows PowerShell's `>`) is named, with the way out
+    let utf16: Vec<u8> = [&[0xFF, 0xFE][..], &"4 0 0-1".encode_utf16().flat_map(|u| u.to_le_bytes()).collect::<Vec<u8>>()].concat();
+    let u = Temp::bytes("utf16.txt", &utf16);
+    let o = run(&["exact", "--graph-file", u.path(), "--rule", "agen6"]);
+    assert_eq!(code(&o), 64);
+    assert!(stderr(&o).contains("UTF-16") && stderr(&o).contains("Out-File -Encoding utf8"), "{}", stderr(&o));
+    // anything else that is not UTF-8 is said so
+    let bad = Temp::bytes("latin1.txt", &[0x34, 0x20, 0xC3, 0x28]);
+    let o = run(&["exact", "--graph-file", bad.path(), "--rule", "agen6"]);
+    assert_eq!(code(&o), 64);
+    assert!(stderr(&o).contains("not valid UTF-8"), "{}", stderr(&o));
 }

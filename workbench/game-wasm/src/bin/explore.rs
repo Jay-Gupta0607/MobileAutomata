@@ -59,6 +59,17 @@ fn normalise_graph(text: &str) -> Result<String, String> {
     Ok(if edges.is_empty() { format!("{} {}", n, s) } else { format!("{} {} {}", n, s, edges) })
 }
 
+/// A text file the way Windows tools write it: a UTF-8 byte order mark is dropped, and UTF-16 (what
+/// Windows PowerShell's `>` writes) is named as the problem instead of failing as "not UTF-8".
+fn read_text(path: &str) -> Result<String, String> {
+    let bytes = std::fs::read(path).map_err(|e| format!("cannot read {}: {}", path, e))?;
+    if bytes.starts_with(&[0xFF, 0xFE]) || bytes.starts_with(&[0xFE, 0xFF]) {
+        return Err(format!("{} is UTF-16 text (Windows PowerShell's `>` writes that); save it as UTF-8, for example with `Out-File -Encoding utf8`", path));
+    }
+    let body = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&bytes);
+    String::from_utf8(body.to_vec()).map_err(|_| format!("{} is not valid UTF-8 text", path))
+}
+
 /// The preset graphs (same texts as the browser page).
 fn preset(name: &str) -> Option<&'static str> {
     match name {
@@ -97,8 +108,7 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
             "--graph" => a.graph = Some(normalise_graph(&value(arg)?)?),
             "--graph-file" => {
                 let path = value(arg)?;
-                let text = std::fs::read_to_string(&path).map_err(|e| format!("cannot read {}: {}", path, e))?;
-                a.graph = Some(normalise_graph(&text)?);
+                a.graph = Some(normalise_graph(&read_text(&path)?)?);
             }
             "--preset" => {
                 let name = value(arg)?;
@@ -107,8 +117,7 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
             "--rule" => a.rule = Some(value(arg)?),
             "--table" => {
                 let path = value(arg)?;
-                let text = std::fs::read_to_string(&path).map_err(|e| format!("cannot read {}: {}", path, e))?;
-                a.table = Some(text);
+                a.table = Some(read_text(&path)?);
             }
             "--k" => a.k = Some(value(arg)?),
             "--model" => a.model = Some(value(arg)?),
@@ -266,7 +275,7 @@ fn main() -> ExitCode {
         }
     };
     let built = match &args.request_file {
-        Some(path) => std::fs::read_to_string(path).map_err(|e| format!("cannot read {}: {}", path, e)),
+        Some(path) => read_text(path),
         None => build_request(&args),
     };
     let request = match built {
