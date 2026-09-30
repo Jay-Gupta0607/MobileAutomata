@@ -1088,11 +1088,14 @@ fn parse_request(input: &str) -> Request {
 }
 
 /// Whether the request runs the paper's model (see `Rule::terminating`).
-fn resolve_model(model: &str, default: &Option<Formula>) -> Result<bool, String> {
+/// With no `model` key it is the paper model whenever the rule can stop (`default agen6`,
+/// or a table row answering `stop`): judged as the classic game a stop would silently mean
+/// "stay" and the verdict would ignore where, or whether, the agent stops.
+fn resolve_model(model: &str, default: &Option<Formula>, table_can_stop: bool) -> Result<bool, String> {
     match model {
         "paper" => Ok(true),
         "classic" => Ok(false),
-        "" => Ok(matches!(default, Some(Formula::AGen6))),
+        "" => Ok(table_can_stop || matches!(default, Some(Formula::AGen6))),
         other => Err(format!("unknown model {} (classic or paper)", other)),
     }
 }
@@ -1113,7 +1116,8 @@ pub fn handle(input: &str) -> String {
             return err(&format!("table entry {} {} uses a colour outside 0..{}", row.text(r.k), act.text(), r.k - 1));
         }
     }
-    let terminating = match resolve_model(&r.model, &r.default) {
+    let table_can_stop = r.table.values().any(|a| a.target == STOP);
+    let terminating = match resolve_model(&r.model, &r.default, table_can_stop) {
         Ok(t) => t,
         Err(e) => return err(&e),
     };
@@ -1542,6 +1546,20 @@ mod tests {
     }
 
     #[test]
+    fn a_table_that_can_stop_is_judged_by_the_paper_model_without_being_told() {
+        let table = "table\n0.10 1>0\n0.01 0>stop\nend\n";
+        // no model key: the stop on vertex 1 is a failure, not a classic 'explores'
+        let auto = handle(&format!("cmd exact\nk 2\ngraph 2 0 0-1\n{}", table));
+        assert!(auto.contains("\"model\":\"paper\"") && auto.contains("\"reason\":\"stopped_off_start\""), "{}", auto);
+        // asking for classic is still honoured: there the stop is only a stay and coverage wins
+        let classic = handle(&format!("cmd exact\nk 2\nmodel classic\ngraph 2 0 0-1\n{}", table));
+        assert!(classic.contains("\"model\":\"classic\"") && classic.contains("\"status\":\"explores\""), "{}", classic);
+        // a table without stop stays classic
+        let plain = handle("cmd exact\nk 2\ngraph 2 0 0-1\ntable\n0.10 1>0\n0.01 0>stay\nend\n");
+        assert!(plain.contains("\"model\":\"classic\""), "{}", plain);
+    }
+
+    #[test]
     fn stop_makes_a_terminal_position_only_in_the_paper_model() {
         let g = Graph::parse("2 0 0-1").unwrap();
         let p = Pos { chi: 0, cur: 0, vis: 1, term: false };
@@ -1561,12 +1579,15 @@ mod tests {
 
     #[test]
     fn model_defaults_to_classic_and_agen6_implies_paper() {
-        assert_eq!(resolve_model("", &Formula::parse("sigma")), Ok(false));
-        assert_eq!(resolve_model("", &None), Ok(false));
-        assert_eq!(resolve_model("", &Formula::parse("agen6")), Ok(true));
-        assert_eq!(resolve_model("paper", &None), Ok(true));
-        assert_eq!(resolve_model("classic", &Formula::parse("agen6")), Ok(false));
-        assert!(resolve_model("nonsense", &None).is_err());
+        assert_eq!(resolve_model("", &Formula::parse("sigma"), false), Ok(false));
+        assert_eq!(resolve_model("", &None, false), Ok(false));
+        assert_eq!(resolve_model("", &Formula::parse("agen6"), false), Ok(true));
+        assert_eq!(resolve_model("paper", &None, false), Ok(true));
+        assert_eq!(resolve_model("classic", &Formula::parse("agen6"), false), Ok(false));
+        assert!(resolve_model("nonsense", &None, false).is_err());
+        // a rule that can stop is judged by the paper model unless `classic` is asked for
+        assert_eq!(resolve_model("", &None, true), Ok(true));
+        assert_eq!(resolve_model("classic", &None, true), Ok(false));
         assert!(handle("cmd answer
 k 6
 row 0.100000
