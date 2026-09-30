@@ -52,6 +52,11 @@ aside{border-left:1px solid var(--rule);background:var(--surface);display:flex;f
 .banner.bad{background:var(--bad-bg);color:var(--bad)}
 .banner.warn{background:var(--warn-bg);color:var(--warn)}
 .banner.neutral{background:var(--pen-soft);color:var(--ink)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.pill{border:1px solid var(--rule);border-radius:999px;padding:2px 10px;font-size:12px;background:var(--surface);color:var(--ink)}
+.pill b{font-weight:600;margin-right:4px}
+.pill.good{background:var(--good-bg);color:var(--good);border-color:transparent}
+.pill.bad{background:var(--bad-bg);color:var(--bad);border-color:transparent}
 table{border-collapse:collapse;width:100%;font-size:12.5px}
 th{text-align:left;color:var(--soft);font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:5px 6px;border-bottom:1px solid var(--rule)}
 td{padding:4px 6px;border-bottom:1px solid var(--rule);vertical-align:middle;white-space:nowrap}
@@ -483,9 +488,12 @@ function resetPlay() {
   if (state.play) computePending();
 }
 function posKey(p) { return p.colours.join(',') + '|' + p.cur + '|' + [...p.vis].sort((a, b) => a - b).join(','); }
+// The paper model (a rule that can stop, or A_Gen6): exploring also needs the agent to return to the start and stop,
+// so reaching the last vertex does not end the play; the classic game ends there.
+function paperMode() { return state.def === 'agen6' || usesStop(); }
 function computePending() {
   const p = state.play; p.pending = null;
-  if (p.vis.size === state.nodes.length) { p.done = { kind: 'explored' }; return; }
+  if (!paperMode() && p.vis.size === state.nodes.length) { p.done = { kind: 'explored' }; return; }
   const key = posKey(p);
   if (p.seen.has(key)) { p.done = { kind: 'confined', repeatAt: p.seen.get(key), unvisited: [...Array(state.nodes.length).keys()].filter((v) => !p.vis.has(v)) }; return; }
   p.seen.set(key, p.steps.length);
@@ -503,6 +511,11 @@ function applyChoice(choice) {
   p.colours[p.cur] = pd.paint;
   if (choice !== null) { p.lastEdge = [p.cur, choice]; p.cur = choice; p.vis.add(choice); } else p.lastEdge = null;
   state.defining = null;
+  if (pd.target === -2) { // stop: the play is over wherever the agent is
+    p.pending = null;
+    p.done = { kind: 'stopped', unvisited: [...Array(state.nodes.length).keys()].filter((v) => !p.vis.has(v)) };
+    return;
+  }
   computePending();
 }
 function undo() {
@@ -546,7 +559,7 @@ function renderHint() {
 function renderGraph() {
   const p = state.play, svg = $('#svg');
   const optionSet = new Set(p && p.pending && p.pending.options.length >= 2 && !(state.replay && state.replay.index < state.replay.steps.length) ? p.pending.options : []);
-  const unv = new Set(p && p.done && p.done.kind === 'confined' ? p.done.unvisited : []);
+  const unv = new Set(p && p.done && (p.done.kind === 'confined' || p.done.kind === 'stopped') ? p.done.unvisited : []);
   let s = '';
   state.edges.forEach(([u, v], i) => {
     const a = state.nodes[u], b = state.nodes[v];
@@ -568,10 +581,29 @@ function renderGraph() {
   });
   svg.innerHTML = s;
 }
+function playPaperStatus(p) {
+  return paperStatus({ visited: p.vis.size, n: state.nodes.length, cur: p.cur, start: state.start, stopped: !!(p.done && p.done.kind === 'stopped'), cycle: !!(p.done && p.done.kind === 'confined') });
+}
+// coverage, return and termination: three separate facts, as in Definition 1 of the paper
+function pillsHtml(p) {
+  const n = state.nodes.length, st = playPaperStatus(p), over = !!p.done, stopped = st.termination === 'stopped';
+  const cov = `<span class="pill ${st.covered ? 'good' : over ? 'bad' : ''}" title="coverage: every vertex is visited"><b>coverage</b>${p.vis.size} of ${n} visited</span>`;
+  const where = stopped ? (st.onStart ? 'stopped on the start vertex' : `stopped on ${NAMES(p.cur)}, not the start ${NAMES(state.start)}`) : (st.onStart ? 'on the start vertex' : `away from the start ${NAMES(state.start)}`);
+  const ret = `<span class="pill ${stopped ? (st.onStart ? 'good' : 'bad') : ''}" title="return: the agent ends on the start vertex"><b>return</b>${where}</span>`;
+  const term = `<span class="pill ${stopped ? 'good' : st.termination === 'never' ? 'bad' : ''}" title="termination: the agent stops"><b>termination</b>${{ running: 'running', stopped: 'stopped', never: 'never stops (a position repeats)' }[st.termination]}</span>`;
+  return `<div class="pills" role="group" aria-label="the three parts of exploring">${cov}${ret}${term}</div>`;
+}
+function stoppedBanner(p) {
+  const ps = playPaperStatus(p), steps = p.steps.length, unv = p.done.unvisited;
+  if (ps.outcome === 'explores') return `<div class="banner good"><b>Explores (paper model).</b> Every vertex was visited and the agent stopped on the start vertex ${NAMES(state.start)} after ${steps} steps.</div>`;
+  if (ps.outcome === 'stopped_early') return `<div class="banner bad"><b>Stopped early.</b> The agent stopped on ${NAMES(p.cur)} after ${steps} steps, but <b>${unv.map(NAMES).join(', ')}</b> ${unv.length === 1 ? 'was' : 'were'} never visited.</div>`;
+  return `<div class="banner bad"><b>Stopped away from the start.</b> Every vertex was visited, but the agent stopped on ${NAMES(p.cur)}, not on the start vertex ${NAMES(state.start)}.</div>`;
+}
 function renderPlay() {
   const p = state.play, box = $('#playstatus');
   if (!p) { box.innerHTML = '<p class="note">Draw a graph to start.</p>'; $('#ledger tbody').innerHTML = ''; return; }
   let s = `<div class="row"><b>Step ${p.steps.length}</b><span class="small">agent at <b>${NAMES(p.cur)}</b>, ${p.vis.size} of ${state.nodes.length} visited</span>${state.replay ? `<span class="small" style="color:var(--pen)">replaying a found execution (${Math.min(state.replay.index, state.replay.steps.length)}/${state.replay.steps.length})</span>` : ''}</div>`;
+  if (paperMode()) s += pillsHtml(p);
   if (state.defining) {
     const d = state.defining;
     s += `<div class="banner warn">The rule has no action for the row <span class="mono">${d.row}</span> ${bagChips(d.row)} read at ${NAMES(p.cur)}. Define it:</div>
@@ -585,6 +617,8 @@ function renderPlay() {
     if (pd.options.length >= 2 && !(state.replay && state.replay.index < state.replay.steps.length)) s += `<div class="banner neutral" id="choicehint">Your move as the adversary: click a highlighted vertex (or Auto step).</div>`;
   } else if (p.done) {
     if (p.done.kind === 'explored') s += `<div class="banner good">Explored: all ${state.nodes.length} vertices visited in ${p.steps.length} steps.</div>`;
+    else if (p.done.kind === 'stopped') s += stoppedBanner(p);
+    else if (p.done.kind === 'confined' && paperMode()) s += `<div class="banner bad"><b>Never stops.</b> The position after step ${p.steps.length} already occurred before step ${p.done.repeatAt + 1}, so these ${p.steps.length - p.done.repeatAt} steps repeat for ever. ${p.done.unvisited.length ? `Never visited: <b>${p.done.unvisited.map(NAMES).join(', ')}</b>.` : 'Every vertex was visited, but the agent does not stop.'}</div>`;
     else if (p.done.kind === 'confined') s += `<div class="banner bad">Trapped: the position after step ${p.steps.length} already occurred before step ${p.done.repeatAt + 1}, so these ${p.steps.length - p.done.repeatAt} steps repeat for ever. Never visited: <b>${p.done.unvisited.map(NAMES).join(', ')}</b>.</div>`;
     else s += `<div class="banner bad">${p.done.message}</div>`;
   }
@@ -593,7 +627,7 @@ function renderPlay() {
   const tb = $('#ledger tbody'); let rows = '';
   const cycFrom = p.done && p.done.kind === 'confined' ? p.done.repeatAt : (state.replay && state.replay.index >= state.replay.steps.length ? state.replay.repeatAt : null);
   p.steps.forEach((st, i) => {
-    rows += `<tr class="${cycFrom !== null && cycFrom !== undefined && i >= cycFrom ? 'cycle' : ''}"><td class="mono">${i}</td><td><b>${NAMES(st.cur)}</b></td><td><span class="mono">${st.row}</span> ${bagChips(st.row)}</td><td><span class="sw" style="background:${PAL[st.paint]}"></span>${st.target === -1 ? 'stay' : '→ ' + CNAME[st.target]}</td><td>${st.options.map(NAMES).join(', ') || '—'}</td><td>${st.next === null ? 'stays' : `<b>${NAMES(st.next)}</b>${st.options.length >= 2 ? ' ◆' : ''}`}</td></tr>`;
+    rows += `<tr class="${cycFrom !== null && cycFrom !== undefined && i >= cycFrom ? 'cycle' : ''}"><td class="mono">${i}</td><td><b>${NAMES(st.cur)}</b></td><td><span class="mono">${st.row}</span> ${bagChips(st.row)}</td><td><span class="sw" style="background:${PAL[st.paint]}"></span>${st.target === -1 ? 'stay' : st.target === -2 ? '■ stop' : '→ ' + CNAME[st.target]}</td><td>${st.options.map(NAMES).join(', ') || '—'}</td><td>${st.next === null ? (st.target === -2 ? 'stops' : 'stays') : `<b>${NAMES(st.next)}</b>${st.options.length >= 2 ? ' ◆' : ''}`}</td></tr>`;
   });
   tb.innerHTML = rows || '<tr><td colspan="6" class="note">No steps yet.</td></tr>';
   const last = tb.querySelector('tr:last-child'); if (last) last.scrollIntoView({ block: 'nearest' });
