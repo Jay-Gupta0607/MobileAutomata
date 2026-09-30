@@ -29,11 +29,14 @@ rule
   --model MODEL       classic or paper (default: paper when the rule can stop, else classic)
 
 search
-  --cap N             exact: most positions to enumerate (default 1000000)
-  --walks N           walks: number of random walks after the three deterministic ones (default 64)
-  --budget N          walks and play: most steps (default 200000)
-  --prefer LIST       play: adversary preference order, e.g. \"1 2 3 0\" (a vertex not listed comes last)
-  --row own.bag       answer: the row to look up, e.g. 3.100100
+  --cap N             exact only: most positions to enumerate, 1000 to 12000000 (default 1000000)
+  --walks N           walks only: random walks after the three deterministic ones, 0 to 100000 (default 64)
+  --budget N          walks and play only: most steps, 10 to 5000000 (default 200000)
+  --prefer LIST       play only: adversary preference order, e.g. \"1 2 3 0\" (a vertex not listed comes last)
+  --row own.bag       answer only: the row to look up, e.g. 3.100100
+
+An option that does not belong to the command is an error, and so is a value outside its range
+(the engine would otherwise adjust it without saying so).
 
 output
   --summary           one line instead of the JSON
@@ -146,20 +149,39 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
     }
 }
 
-/// A number option must be digits only; anything else would silently fall back to the engine's default.
-fn number(name: &str, v: &str) -> Result<String, String> {
-    if !v.is_empty() && v.bytes().all(|b| b.is_ascii_digit()) {
-        Ok(v.to_string())
-    } else {
-        Err(format!("{} must be a whole number, got {:?}", name, v))
+/// A number option must be digits only and inside `lo..=hi`: anything else would silently fall back
+/// to the engine's default or be clamped to its limits.
+fn number(name: &str, v: &str, lo: u64, hi: u64) -> Result<String, String> {
+    if v.is_empty() || !v.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(format!("{} must be a whole number, got {:?}", name, v));
     }
+    match v.parse::<u64>() {
+        Ok(n) if (lo..=hi).contains(&n) => Ok(n.to_string()),
+        _ => Err(format!("{} must be between {} and {}, got {}", name, lo, hi, v)),
+    }
+}
+
+/// An option given for a command that does not read it would have no effect, and no warning.
+fn only_for(a: &Args, option: &str, present: bool, commands: &[&str]) -> Result<(), String> {
+    if present && !commands.contains(&a.command.as_str()) {
+        return Err(format!("{} does not apply to `{}` (it is for {})", option, a.command, commands.join(" and ")));
+    }
+    Ok(())
 }
 
 /// The request text of the engine's line protocol.
 fn build_request(a: &Args) -> Result<String, String> {
+    only_for(a, "--cap", a.cap.is_some(), &["exact"])?;
+    only_for(a, "--walks", a.walks.is_some(), &["walks"])?;
+    only_for(a, "--budget", a.budget.is_some(), &["walks", "play"])?;
+    only_for(a, "--prefer", a.prefer.is_some(), &["play"])?;
+    only_for(a, "--row", a.row.is_some(), &["answer"])?;
+    if a.command == "answer" && a.graph.is_some() {
+        return Err("`answer` looks up one row and takes no graph".into());
+    }
     let mut r = format!("cmd {}\n", a.command);
     if let Some(k) = &a.k {
-        r += &format!("k {}\n", number("--k", k)?);
+        r += &format!("k {}\n", number("--k", k, 2, 6)?);
     } else if a.rule.as_deref() == Some("agen6") {
         r += "k 6\n";
     }
@@ -174,13 +196,13 @@ fn build_request(a: &Args) -> Result<String, String> {
         r += &format!("model {}\n", m);
     }
     if let Some(v) = &a.cap {
-        r += &format!("cap {}\n", number("--cap", v)?);
+        r += &format!("cap {}\n", number("--cap", v, 1000, 12_000_000)?);
     }
     if let Some(v) = &a.walks {
-        r += &format!("walks {}\n", number("--walks", v)?);
+        r += &format!("walks {}\n", number("--walks", v, 0, 100_000)?);
     }
     if let Some(v) = &a.budget {
-        r += &format!("budget {}\n", number("--budget", v)?);
+        r += &format!("budget {}\n", number("--budget", v, 10, 5_000_000)?);
     }
     if let Some(p) = &a.prefer {
         r += &format!("prefer {}\n", p.split(|c: char| c == ',' || c.is_whitespace()).filter(|x| !x.is_empty()).collect::<Vec<_>>().join(" "));

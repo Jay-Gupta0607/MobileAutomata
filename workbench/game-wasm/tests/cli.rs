@@ -202,3 +202,45 @@ fn files_written_by_windows_tools_are_read_or_explained() {
     assert_eq!(code(&o), 64);
     assert!(stderr(&o).contains("not valid UTF-8"), "{}", stderr(&o));
 }
+
+#[test]
+fn options_that_do_not_belong_to_the_command_are_errors() {
+    let cases: [&[&str]; 6] = [
+        &["exact", "--graph", TREE, "--rule", "agen6", "--walks", "5"],
+        &["exact", "--graph", TREE, "--rule", "agen6", "--budget", "100"],
+        &["play", "--graph", TREE, "--rule", "agen6", "--cap", "2000"],
+        &["walks", "--graph", TREE, "--rule", "agen6", "--prefer", "1"],
+        &["exact", "--graph", TREE, "--rule", "agen6", "--row", "4.001000"],
+        &["answer", "--graph", TREE, "--rule", "agen6", "--row", "4.001000"],
+    ];
+    for args in cases {
+        let o = run(args);
+        assert_eq!(code(&o), 64, "{:?}", args);
+        assert!(stderr(&o).contains("does not apply") || stderr(&o).contains("takes no graph"), "{:?}: {}", args, stderr(&o));
+    }
+    // each option is still accepted by the commands that read it
+    assert_eq!(code(&run(&["exact", "--graph", TREE, "--rule", "agen6", "--cap", "5000"])), 0);
+    assert_eq!(code(&run(&["walks", "--graph", TREE, "--rule", "agen6", "--walks", "3", "--budget", "500"])), 4);
+    assert_eq!(code(&run(&["play", "--graph", TREE, "--rule", "agen6", "--budget", "500"])), 0);
+}
+
+#[test]
+fn numbers_outside_the_engines_limits_are_errors_not_adjusted() {
+    let bad: [&[&str]; 6] = [
+        &["exact", "--graph", TREE, "--rule", "agen6", "--cap", "999"],
+        &["exact", "--graph", TREE, "--rule", "agen6", "--cap", "12000001"],
+        &["walks", "--graph", TREE, "--rule", "agen6", "--walks", "100001"],
+        &["play", "--graph", TREE, "--rule", "agen6", "--budget", "9"],
+        &["walks", "--graph", TREE, "--rule", "agen6", "--budget", "5000001"],
+        &["exact", "--graph", TREE, "--rule", "agen6", "--k", "7"],
+    ];
+    for args in bad {
+        let o = run(args);
+        assert_eq!(code(&o), 64, "{:?}", args);
+        assert!(stderr(&o).contains("must be between"), "{:?}: {}", args, stderr(&o));
+    }
+    // the limits themselves are fine
+    assert_eq!(code(&run(&["exact", "--graph", TREE, "--rule", "agen6", "--cap", "1000"])), 0);
+    assert_eq!(code(&run(&["play", "--graph", TREE, "--rule", "agen6", "--budget", "10"])), 5);
+    assert_eq!(code(&run(&["walks", "--graph", TREE, "--rule", "agen6", "--walks", "0"])), 4);
+}

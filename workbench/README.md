@@ -68,8 +68,11 @@ native run and a browser run answer identically.  From `game-wasm/`:
 Commands: `exact` (every adversary), `walks`, `play` (one adversary, named by `--prefer`), `answer` (the
 action for one row).  The graph comes from `--graph "n s u-v,..."`, `--graph-file FILE` or `--preset sketch1`
 (edge pieces may be separated by spaces or line breaks).  The rule is `--rule NAME` (a formula such as `sigma` or
-`agen6`), `--table FILE` (rows `own.bag paint>target`, `#` comments), or both (table rows win).  Also `--k`,
-`--model classic|paper`, `--cap`, `--walks`, `--budget`.  The JSON of the protocol is printed; `--summary`
+`agen6`), `--table FILE` (rows `own.bag paint>target`, `#` comments), or both (table rows win).  Also `--k`
+(2 to 6), `--model classic|paper`, `--cap` (exact only, 1000 to 12000000), `--walks` (walks only, 0 to
+100000), `--budget` (walks and play, 10 to 5000000), `--prefer` (play only), `--row` (answer only): an option
+that does not belong to the command, or a value outside its range, is an error rather than being adjusted
+quietly.  Files may be UTF-8 with or without a byte order mark.  The JSON of the protocol is printed; `--summary`
 prints one line, `--request` prints the request instead of running it.
 
 Exit status: 0 explores, 1 fails, 2 undefined row, 3 overflow (raise `--cap`), 4 unrefuted (the walks found no
