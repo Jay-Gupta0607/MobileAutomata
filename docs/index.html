@@ -675,8 +675,11 @@ function renderPlay() {
   p.steps.forEach((st, i) => {
     rows += `<tr class="${cycFrom !== null && cycFrom !== undefined && i >= cycFrom ? 'cycle' : ''}"><td class="mono">${i}</td><td><b>${NAMES(st.cur)}</b></td><td><span class="mono">${st.row}</span> ${bagChips(st.row)}${st.rule ? ` <span class="small" title="${namedColours() && AGEN6_RULES[st.rule] ? AGEN6_RULES[st.rule] : 'rule ' + st.rule}">· r${st.rule}</span>` : ''}</td><td><span class="sw" style="background:${PAL[st.paint]}"></span>${st.target === -1 ? 'stay' : st.target === -2 ? '■ stop' : '→ ' + cname(st.target)}</td><td>${st.options.map(NAMES).join(', ') || '—'}</td><td>${st.next === null ? (st.target === -2 ? 'stops' : 'stays') : `<b>${NAMES(st.next)}</b>${st.options.length >= 2 ? ' ◆' : ''}`}</td></tr>`;
   });
+  // follow the newest step inside the ledger's own box, but only if it was already at the bottom (not while you read
+  // older rows), and never scroll the panel or the page: scrollIntoView on the last row did that at every step
+  const wrap = $('#ledgerwrap'), atBottom = wrap.scrollHeight - wrap.scrollTop - wrap.clientHeight < 8;
   tb.innerHTML = rows || '<tr><td colspan="6" class="note">No steps yet.</td></tr>';
-  const last = tb.querySelector('tr:last-child'); if (last) last.scrollIntoView({ block: 'nearest' });
+  if (atBottom) wrap.scrollTop = wrap.scrollHeight;
   const bDefine = $('#b-define'); if (bDefine) bDefine.addEventListener('click', () => { const row = state.defining.row; state.table.set(row, { paint: +$('#def-paint').value, target: +$('#def-target').value }); save(); state.defining = null; p.seen.delete(posKey(p)); computePending(); render(); });
   const bUndo = $('#b-undo'); if (bUndo) bUndo.addEventListener('click', () => { stopPlay(); undo(); render(); });
   $('#b-step').disabled = !!p.done; $('#b-auto').disabled = !!p.done; $('#b-play').disabled = !!p.done;
