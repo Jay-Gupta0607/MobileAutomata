@@ -119,7 +119,8 @@ impl Action {
         } else if t == "stop" {
             STOP
         } else {
-            t.parse().ok()?
+            // a number is a colour: 254 and 255 are the codes of stop and stay, not colours
+            t.parse::<u8>().ok().filter(|&c| c < STOP)?
         };
         Some(Action { paint, target })
     }
@@ -1244,6 +1245,11 @@ mod tests {
         assert_eq!(a.text(), "2>stop");
         assert_eq!(Action::parse("3>stay").unwrap().text(), "3>stay");
         assert_eq!(Action::parse("3>7").unwrap().target, 7);
+        // the numeric codes of the two special targets are not colours
+        assert_eq!(Action::parse("2>254"), None);
+        assert_eq!(Action::parse("2>255"), None);
+        assert_eq!(Action::parse("2>5").unwrap().target, 5);
+        assert_eq!(Action::parse("2>s").unwrap().target, STAY);
         // a table row may answer `stop` (not rejected as an out-of-range colour); the answer reports target -2
         let out = handle("cmd answer\nk 6\nrow 4.000000\ntable\n4.000000 2>stop\nend\n");
         assert!(out.contains("\"defined\":true") && out.contains("\"paint\":2") && out.contains("\"target\":-2"), "{}", out);
