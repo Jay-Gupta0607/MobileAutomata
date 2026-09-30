@@ -175,6 +175,39 @@ const $ = (s) => document.querySelector(s);
 const PAL = ['var(--c0)', 'var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)'];
 const CNAME = ['white', 'colour 1', 'colour 2', 'colour 3', 'colour 4', 'colour 5'];
 
+// <page-logic> pure functions, no DOM and no state: checked by game-wasm/testdata/check_page_logic.mjs,
+// which also holds them to the engine's own verdicts.
+// A_Gen6 (Takahashi et al., Algorithm 2): the names of its six colours and what each rule does.
+const AGEN6_COLOURS = ['init', 'path', 'fin', 'head1', 'head2', 'neigh'];
+const AGEN6_RULES = [null,
+  'a probed vertex touching the path would make a chord: mark it neigh and go back to the head',
+  'a probed vertex may join the path: mark it head1 (a candidate) and go back to the head',
+  'the start vertex: become head1',
+  'probe an init neighbour',
+  'nothing left to probe (or a candidate is waiting): become head2',
+  'a rejected neighbour is left: go and reset it',
+  'commit to a candidate: become path and move to it',
+  'no candidate left: become fin and back up along the path',
+  'nothing left at the start: become fin and stop',
+  'back on a path vertex: it becomes the head again',
+  'a rejected neighbour: reset it to init and return to the head'];
+// The label of colour c: its name when the rule names its colours, else white / colour c.
+function colourLabel(c, named) { return named ? AGEN6_COLOURS[c] : c === 0 ? 'white' : 'colour ' + c; }
+// Exploring in the paper model (Definition 1 of Takahashi et al.) has three parts, kept apart:
+// coverage (every vertex visited), return (the agent is on the start vertex) and termination (it stops).
+// v: { visited, n, cur, start, stopped, cycle }.  The outcome is 'running' until the agent stops or the
+// position repeats; then 'explores' only if it stopped on the start with every vertex visited, else the
+// engine's reasons: 'stopped_early' (unvisited vertices, whatever the place), 'stopped_off_start', 'never_stops'.
+function paperStatus(v) {
+  const covered = v.visited === v.n, onStart = v.cur === v.start;
+  const termination = v.stopped ? 'stopped' : v.cycle ? 'never' : 'running';
+  let outcome = 'running';
+  if (v.stopped) outcome = !covered ? 'stopped_early' : !onStart ? 'stopped_off_start' : 'explores';
+  else if (v.cycle) outcome = 'never_stops';
+  return { covered, onStart, termination, outcome };
+}
+// </page-logic>
+
 // ------------------------------------------------------------ engine (wasm)
 function b64ToBytes(b64) { const bin = atob(b64); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out.buffer; }
 async function wasmBytes() {
