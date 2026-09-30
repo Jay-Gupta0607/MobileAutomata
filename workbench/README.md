@@ -80,7 +80,7 @@ failure: not a proof), 5 unfinished (`play` ran out of budget), 64 usage error o
 `cargo test` in `game-wasm/` also runs the tool's tests (`tests/cli.rs`).  `build.sh` builds only the library
 for WebAssembly.
 
-Native and WebAssembly are held to the same answers by the fixtures in `game-wasm/testdata/fixtures` (24 protocol
+Native and WebAssembly are held to the same answers by the fixtures in `game-wasm/testdata/fixtures` (protocol
 requests with their expected JSON): `cargo test` runs them natively, and after `sh build.sh`,
 `node game-wasm/testdata/check_wasm_parity.mjs` sends the same requests to `site/game.wasm` and also checks that
 `docs/index.html` embeds that build.  `node game-wasm/testdata/check_agen6_template.mjs` checks the page's A_Gen6
