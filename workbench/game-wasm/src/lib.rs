@@ -1753,7 +1753,15 @@ mod tests {
                         assert_eq!(trace.unvisited, 0);
                         assert_eq!(trace.steps.last().unwrap().act.target, STOP);
                     }
-                    _ => panic!("A_Gen6 must explore graph `{} {}` from vertex {}", n, edges, start),
+                    other => {
+                        let why = match other {
+                            Outcome::Fails { trace, .. } => format!("fails: {}", fail_reason(&trace)),
+                            Outcome::Overflow { positions } => format!("overflow after {} positions", positions),
+                            Outcome::Undefined { row, .. } => format!("undefined row {}", row.text(6)),
+                            _ => "another outcome".to_string(),
+                        };
+                        panic!("A_Gen6 must explore graph `{} {}` from vertex {} ({})", n, edges, start, why);
+                    }
                 }
                 pairs += 1;
             }

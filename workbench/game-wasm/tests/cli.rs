@@ -21,9 +21,7 @@ fn code(o: &Output) -> i32 {
 struct Temp(PathBuf);
 impl Temp {
     fn new(name: &str, text: &str) -> Temp {
-        let path = std::env::temp_dir().join(format!("explore-test-{}-{}", std::process::id(), name));
-        std::fs::write(&path, text).unwrap();
-        Temp(path)
+        Temp::bytes(name, text.as_bytes())
     }
     fn bytes(name: &str, bytes: &[u8]) -> Temp {
         let path = std::env::temp_dir().join(format!("explore-test-{}-{}", std::process::id(), name));
@@ -102,8 +100,12 @@ fn the_graph_can_come_from_a_file_or_a_preset() {
 fn the_sketch1_preset_is_the_graph_of_the_page() {
     // the tool's copy of the preset must not drift from the one in the page
     let html = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("site").join("index.html")).unwrap();
-    let after = html.split("sketch1: { text: '").nth(1).expect("the page defines the sketch1 preset");
-    let page_text = after.split('\'').next().unwrap();
+    // the text of the sketch1 entry: after its key, after `text:`, between the quotes that follow
+    let entry = &html[html.find("sketch1:").expect("the page defines the sketch1 preset")..];
+    let after_key = entry[entry.find("text:").expect("the sketch1 preset has a text") + "text:".len()..].trim_start();
+    let quote = after_key.chars().next().unwrap();
+    assert!(quote == '"' || quote == '\'', "the preset text is a quoted string");
+    let page_text = after_key[1..].split(quote).next().unwrap();
     let o = run(&["exact", "--preset", "sketch1", "--request"]);
     assert!(stdout(&o).lines().any(|l| l == format!("graph {}", page_text)), "{} vs the page: {}", stdout(&o), page_text);
 }
@@ -262,7 +264,7 @@ fn a_closed_pipe_does_not_hide_the_outcome() {
     // `explore ... | head -c 0`: the reader goes away before the answer is written.  The exit status is
     // still the outcome's (0, explores), not a panic (101) from a failed print.
     let mut child = Command::new(env!("CARGO_BIN_EXE_explore"))
-        .args(["exact", "--preset", "sketch1", "--rule", "sigma", "--cap", "3000000"])
+        .args(["exact", "--preset", "sketch1", "--rule", "agen6"])
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
