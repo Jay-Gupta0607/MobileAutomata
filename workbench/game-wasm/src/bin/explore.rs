@@ -4,6 +4,7 @@
 //! `game_wasm::handle`, so a native run and a run in the WebAssembly build give the same
 //! answer for the same request.  No dependencies.
 
+use std::io::Write;
 use std::process::ExitCode;
 
 const USAGE: &str = "\
@@ -283,13 +284,24 @@ fn summary(json: &str) -> String {
     s
 }
 
+/// Writes to stdout without panicking: a reader that has gone away (`explore ... | head`) is not an
+/// error worth hiding the outcome's exit status for; any other write failure is reported.
+fn emit(text: &str) {
+    let mut out = std::io::stdout().lock();
+    if let Err(e) = out.write_all(text.as_bytes()).and_then(|_| out.flush()) {
+        if e.kind() != std::io::ErrorKind::BrokenPipe {
+            eprintln!("explore: cannot write the answer: {}", e);
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let args = match parse_args(&argv) {
         Ok(a) => a,
         Err(msg) => {
             if msg.is_empty() {
-                print!("{}", USAGE);
+                emit(USAGE);
                 return ExitCode::SUCCESS;
             }
             eprintln!("explore: {}\n{}", msg, SHORT);
@@ -308,14 +320,14 @@ fn main() -> ExitCode {
         }
     };
     if args.request {
-        print!("{}", request);
+        emit(&request);
         return ExitCode::SUCCESS;
     }
     let json = game_wasm::handle(&request);
     if args.summary {
-        println!("{}", summary(&json));
+        emit(&format!("{}\n", summary(&json)));
     } else {
-        println!("{}", json);
+        emit(&format!("{}\n", json));
     }
     ExitCode::from(exit_code(json_str(&json, "status").unwrap_or("error")))
 }

@@ -244,3 +244,19 @@ fn numbers_outside_the_engines_limits_are_errors_not_adjusted() {
     assert_eq!(code(&run(&["play", "--graph", TREE, "--rule", "agen6", "--budget", "10"])), 5);
     assert_eq!(code(&run(&["walks", "--graph", TREE, "--rule", "agen6", "--walks", "0"])), 4);
 }
+
+#[test]
+fn a_closed_pipe_does_not_hide_the_outcome() {
+    // `explore ... | head -c 0`: the reader goes away before the answer is written.  The exit status is
+    // still the outcome's (0, explores), not a panic (101) from a failed print.
+    let mut child = Command::new(env!("CARGO_BIN_EXE_explore"))
+        .args(["exact", "--preset", "sketch1", "--rule", "sigma", "--cap", "3000000"])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .expect("the explore binary runs");
+    drop(child.stdout.take());
+    let out = child.wait_with_output().unwrap();
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(!String::from_utf8_lossy(&out.stderr).contains("panicked"), "{}", String::from_utf8_lossy(&out.stderr));
+}
