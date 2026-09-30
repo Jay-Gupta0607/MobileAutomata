@@ -1,0 +1,6 @@
+cmd exact
+k 2
+graph 2 0 0-1
+table
+0.10 1>0 0.01 0>stop
+end
