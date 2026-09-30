@@ -71,9 +71,11 @@ rule that can `stop` (a table row whose target is `stop`) is played the same way
   start) with the same three indicators, and a found execution can be replayed step by step;
 * the rules table and the define-row prompt offer `stop (paper model)` next to `stay`.
 
-The classic game keeps its own behaviour and wording.  `game-wasm/testdata/check_page_logic.mjs` compiles the page's
-script and holds its paper-model logic to the engine (for every paper-model fixture the page's verdict must equal
-the engine's reason and indicators); `check_wasm_parity.mjs` also requires the A_Gen6 presets to explore.
+The classic game keeps its own behaviour and wording.  `game-wasm/testdata/check_page_logic.mjs` compiles the script of
+both pages and holds the paper-model logic to the engine (for every paper-model fixture the page's verdict must equal
+the engine's reason and indicators); `check_page_play.mjs` runs the page's real script headlessly against the real
+engine and drives the Play tab (when a play ends, the banners and indicators, rule numbers, colour names, undo after a
+stop, replay); `check_wasm_parity.mjs` also requires the A_Gen6 presets to explore.
 
 ## Command line (`explore`)
 
@@ -107,8 +109,9 @@ Native and WebAssembly are held to the same answers by the fixtures in `game-was
 requests with their expected JSON): `cargo test` runs them natively, and after `sh build.sh`,
 `node game-wasm/testdata/check_wasm_parity.mjs` sends the same requests to `site/game.wasm` and also checks that
 `docs/index.html` embeds that build.  `node game-wasm/testdata/check_agen6_template.mjs` checks the page's A_Gen6
-template against the engine's rule (action and rule number, for every row up to degree 4), and
-`node game-wasm/testdata/check_page_logic.mjs` checks that the page's script compiles and its paper-model logic.
+template against the engine's rule (action and rule number, for every row up to degree 4), ,
+`node game-wasm/testdata/check_page_logic.mjs` checks that the pages' scripts compile and their paper-model logic, and
+`node game-wasm/testdata/check_page_play.mjs` drives the Play tab headlessly.
 
 ## Protocol (for other front ends)
 

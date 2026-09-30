@@ -13,11 +13,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(here, '..', '..', 'site', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 // 0. the whole script must compile: a stray backtick inside one of the code templates (they are template
 // literals) ends the string early and the page then does not load at all, which no test of the pieces notices
-const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
-if (scripts.length === 0) throw new Error('no <script> in site/index.html');
-for (const [i, src] of scripts.entries()) {
-  try { new vm.Script(src, { filename: `index.html script ${i + 1}` }); }
-  catch (e) { console.log(`FAIL  the page script does not compile: ${e.message}`); process.exit(1); }
+// (docs/index.html is what GitHub Pages serves: the same page with the engine inlined, built from site/index.html)
+for (const [name, text] of [['site/index.html', html], ['docs/index.html', readFileSync(join(here, '..', '..', '..', 'docs', 'index.html'), 'utf8').replace(/\r\n/g, '\n')]]) {
+  const scripts = [...text.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  if (scripts.length === 0) throw new Error(`no <script> in ${name}`);
+  for (const [i, src] of scripts.entries()) {
+    try { new vm.Script(src, { filename: `${name} script ${i + 1}` }); }
+    catch (e) { console.log(`FAIL  the script of ${name} does not compile: ${e.message}`); process.exit(1); }
+  }
 }
 const a = html.indexOf('// <page-logic>'), b = html.indexOf('// </page-logic>');
 if (a < 0 || b < a) throw new Error('the page-logic block was not found in site/index.html');
@@ -43,7 +46,15 @@ same(paperStatus(v({ stopped: true })).termination, 'stopped', 'termination: sto
 same(paperStatus(v({ cycle: true })).termination, 'never', 'termination: never');
 
 // 2. the colour names and the rule descriptions
-same(AGEN6_COLOURS, ['init', 'path', 'fin', 'head1', 'head2', 'neigh'], 'the six A_Gen6 colours, in the engine numbering');
+// the template's constants (INIT = 0, PATH = 1, ...) are what the engine agreement check pins to the engine's numbering
+const tpl = html.slice(html.indexOf('  agen6: `'));
+const consts = tpl.match(/const INIT = (\d), PATH = (\d), FIN = (\d), HEAD1 = (\d), HEAD2 = (\d), NEIGH = (\d);/);
+check(consts !== null, 'the template declares its colour constants on one line');
+if (consts) {
+  const names = ['init', 'path', 'fin', 'head1', 'head2', 'neigh'], byNumber = [];
+  names.forEach((nm, i) => { byNumber[+consts[i + 1]] = nm; });
+  same(AGEN6_COLOURS, byNumber, 'the page names colour n as the template does');
+}
 same([colourLabel(0, true), colourLabel(3, true), colourLabel(5, true)], ['init', 'head1', 'neigh'], 'named colours');
 same([colourLabel(0, false), colourLabel(4, false)], ['white', 'colour 4'], 'numbered colours');
 same(AGEN6_RULES.length, 12, 'rule descriptions for 1 to 11 (index 0 unused)');
