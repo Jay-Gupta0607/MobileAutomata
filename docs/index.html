@@ -720,7 +720,9 @@ function renderGraph() {
     if (state.edgeFrom === i) s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r * 1.35}" fill="none" style="stroke:var(--warn)" stroke-width="3"/>`;
     s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r}" style="fill:${PAL[col]};stroke:var(--ink)" stroke-width="2.5"/>`;
     s += `<text x="${nd.x}" y="${nd.y}" dy=".35em" text-anchor="middle" style="font-family:var(--mono);font-weight:600;font-size:14px;pointer-events:none" fill="${col === 3 || col === 4 || col === 5 ? '#fff' : '#241f45'}">${NAMES(i)}</text>`;
-    if (i === state.start) s += `<text x="${nd.x}" y="${nd.y - r - 8}" text-anchor="middle" style="font-size:11px;fill:var(--soft);pointer-events:none">start</text>`;
+    // above the halo (1.9 r), the largest thing drawn around a vertex, so the agent's ring (1.5 r) never crosses the label;
+    // but not above the top of the canvas, where it would be cut off
+    if (i === state.start) s += `<text x="${nd.x}" y="${Math.max(nd.y - r * 1.9 - 4, 11)}" text-anchor="middle" style="font-size:11px;fill:var(--soft);pointer-events:none">start</text>`;
     s += '</g>';
   });
   svg.innerHTML = s;

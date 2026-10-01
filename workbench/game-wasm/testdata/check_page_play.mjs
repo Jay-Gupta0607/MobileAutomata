@@ -210,6 +210,19 @@ for (const bad of ['', '0', '1', '33', '-4', '2.5', 'abc', '1e3']) {
   same([alerts, graphOf()], [['A random graph has 2 to 32 vertices.'], '4 0 0-1,0-2,1-3'], `"${bad}" vertices: refused, canvas unchanged`);
 }
 
+// 9b. the "start" label above the start vertex is clear of the agent's ring (radius 27, stroke 5: 29.5 out) and of the
+//     option halo (34.2 out), and is not pushed off the top of the canvas
+setup({ k: 6, def: 'agen6', graph: '4 0 0-1,0-2,1-3' }); // the agent starts on the start vertex, so its ring is drawn there
+P.render();
+const startLabel = () => { const m = String(element('#svg').innerHTML).match(/<text x="([\d.]+)" y="(-?[\d.]+)"[^>]*>start<\/text>/); return m ? { x: +m[1], y: +m[2] } : null; };
+const startNode = P.state.nodes[P.state.start], startY = startNode.y, label = startLabel();
+check(label !== null, 'the start vertex has a label');
+check(label && startY - label.y >= 34.2 + 2, `the label's baseline is above the halo, so above the ring (${label && (startY - label.y).toFixed(1)} units over the centre)`);
+check(label && label.x === startNode.x, 'and it is centred on the vertex');
+startNode.y = 20; P.render(); // a vertex dragged to the top edge
+check(startLabel().y >= 8, `near the top of the canvas the label stays on it (baseline ${startLabel().y})`);
+startNode.y = startY; P.render();
+
 // 10. what the Analysis tab shows belongs to the graph it was computed for: replacing the whole graph (the random graph
 //     button, a preset, Import) clears it, and cancels a search that is still running for the old graph.  Before this,
 //     "Load this execution" stayed on the page and replayed the old graph's trace on the new graph ("Trapped").
