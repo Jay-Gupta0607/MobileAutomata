@@ -89,6 +89,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
   </div>
   <div class="group"><label for="k">colours</label><select id="k"><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option></select><span id="khint" class="khint" role="status"></span></div>
   <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I (17)</option><option value="sketch2">Sketch II (14)</option><option value="paw">paw + pendant (k=2 killer)</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path (hand trace 1)</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle (hand trace 2)</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree (hand trace 3)</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="clear">empty canvas</option></select></div>
+  <div class="group"><label for="rn">random graph</label><input type="number" id="rn" value="10" min="2" max="32" step="1" style="width:64px" title="How many vertices: 2 to 32"><button type="button" id="b-random" title="Replace the canvas with a new random connected graph of this many vertices">Generate</button></div>
   <div class="group"><button type="button" id="b-import-graph">Import / export graph</button></div>
   <div class="group small" id="wasm-status">loading engine…</div>
 </header>
@@ -228,6 +229,82 @@ function colourHint(rule, k) {
   const text = need.exact ? `${need.name} needs ${need.n} colours` : `${need.name} needs at least ${need.n} colours`;
   return k < need.n ? { text: `${text} (now ${k})`, warn: true } : { text, warn: false };
 }
+// A random connected graph with n vertices (2 to 32, the engine's limit), as the text "n 0 u-v,u-v,..." (start vertex 0)
+// and as the list of its edges: a random spanning tree (every vertex after the first joins a random earlier one), then
+// up to n/2 more random edges, so trees, cycles and denser graphs all turn up.  No vertex gets more than 15 neighbours,
+// the engine's limit.  rand() returns a number in [0, 1), as Math.random does.
+const RANDOM_GRAPH_MIN = 2, RANDOM_GRAPH_MAX = 32, MAX_DEGREE = 15;
+function randomGraph(n, rand) {
+  if (!Number.isInteger(n) || n < RANDOM_GRAPH_MIN || n > RANDOM_GRAPH_MAX) throw new Error(`A random graph has ${RANDOM_GRAPH_MIN} to ${RANDOM_GRAPH_MAX} vertices.`);
+  const pick = (m) => Math.floor(rand() * m), deg = new Array(n).fill(0), seen = new Set(), edges = [];
+  const key = (u, v) => Math.min(u, v) * n + Math.max(u, v);
+  const add = (u, v) => { seen.add(key(u, v)); deg[u]++; deg[v]++; edges.push([Math.min(u, v), Math.max(u, v)]); };
+  for (let v = 1; v < n; v++) { // some earlier vertex always has room: a tree on v vertices has degrees summing to 2(v-1) < 15v
+    const open = []; for (let u = 0; u < v; u++) if (deg[u] < MAX_DEGREE) open.push(u);
+    add(open[pick(open.length)], v);
+  }
+  for (let tries = pick(Math.floor(n / 2) + 1); tries > 0; tries--) {
+    const u = pick(n), v = pick(n);
+    if (u !== v && deg[u] < MAX_DEGREE && deg[v] < MAX_DEGREE && !seen.has(key(u, v))) add(u, v);
+  }
+  return { n, edges, text: `${n} 0 ${edges.map(([u, v]) => u + '-' + v).join(',')}` };
+}
+// Where to draw the vertices so the graph can be read: 300 rounds of the Fruchterman-Reingold spring layout (every pair
+// of vertices pushes apart, every edge pulls together, the moves cool down) in a w by h box, starting from a circle
+// shaken a little with rand().  Returns [[x, y], ...], inside the box.
+function springLayout(n, edges, w, h, rand) {
+  const k = 0.8 * Math.sqrt(w * h / n), pos = [];
+  for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + 2 * Math.PI * i / n; pos.push([w / 2 + 0.4 * w * Math.cos(a) + (rand() - 0.5) * k * 0.2, h / 2 + 0.4 * h * Math.sin(a) + (rand() - 0.5) * k * 0.2]); }
+  let heat = w / 8;
+  for (let round = 0; round < 300; round++, heat *= 0.98) {
+    const move = pos.map(() => [0, 0]);
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      const dx = pos[i][0] - pos[j][0], dy = pos[i][1] - pos[j][1], d = Math.max(Math.hypot(dx, dy), 0.01), f = k * k / (d * d);
+      move[i][0] += dx * f; move[i][1] += dy * f; move[j][0] -= dx * f; move[j][1] -= dy * f;
+    }
+    for (const [u, v] of edges) {
+      const dx = pos[u][0] - pos[v][0], dy = pos[u][1] - pos[v][1], f = Math.hypot(dx, dy) / k;
+      move[u][0] -= dx * f; move[u][1] -= dy * f; move[v][0] += dx * f; move[v][1] += dy * f;
+    }
+    for (let i = 0; i < n; i++) {
+      const len = Math.max(Math.hypot(move[i][0], move[i][1]), 1e-9), step = Math.min(len, heat);
+      pos[i][0] = Math.min(w, Math.max(0, pos[i][0] + move[i][0] / len * step));
+      pos[i][1] = Math.min(h, Math.max(0, pos[i][1] + move[i][1] / len * step));
+    }
+  }
+  // the spring layout can leave vertices touching, or two on one spot where the box edge pins them: push such pairs apart
+  const gap = 44; // a vertex is 36 wide
+  for (let round = 0; round < 200; round++) {
+    let moved = false;
+    for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+      let dx = pos[i][0] - pos[j][0], dy = pos[i][1] - pos[j][1]; const d = Math.hypot(dx, dy);
+      if (d >= gap) continue;
+      if (d < 1e-6) { dx = Math.cos(i * 2.4 + j); dy = Math.sin(i * 2.4 + j); } else { dx /= d; dy /= d; }
+      const push = (gap - d) / 2 + 0.5;
+      pos[i][0] = Math.min(w, Math.max(0, pos[i][0] + dx * push)); pos[i][1] = Math.min(h, Math.max(0, pos[i][1] + dy * push));
+      pos[j][0] = Math.min(w, Math.max(0, pos[j][0] - dx * push)); pos[j][1] = Math.min(h, Math.max(0, pos[j][1] - dy * push));
+      moved = true;
+    }
+    if (!moved) break;
+  }
+  return pos;
+}
+// The part of the 1000 x 640 canvas where a random graph puts its vertices, as { x, y, w, h }: the usual margins, pushed in
+// so that no vertex, with its halo (34 units), lies under the legend (top right) or the hint (bottom left), which are
+// drawn over the canvas.  `cover` lists the rectangles they cover, in canvas units ({ left, top, right, bottom }): one
+// in the upper half pushes the top edge down, one in the lower half pushes the bottom edge up, and one beside the
+// area (the canvas is letterboxed when the window is wide) is ignored.  If that leaves too little room, the margins alone.
+function layoutArea(cover) {
+  const H = 640, X0 = 50, X1 = 950, CLEAR = 42;
+  let top = 40, bottom = H - 40;
+  for (const r of cover) {
+    if (r.right <= X0 || r.left >= X1) continue;
+    if (r.bottom < H / 2) top = Math.max(top, r.bottom + CLEAR);
+    else if (r.top > H / 2) bottom = Math.min(bottom, r.top - CLEAR);
+  }
+  if (bottom - top < 250) { top = 40; bottom = H - 40; }
+  return { x: X0, y: top, w: X1 - X0, h: bottom - top };
+}
 // </page-logic>
 
 // ------------------------------------------------------------ engine (wasm)
@@ -313,6 +390,31 @@ function loadGraphText(text, coords, box) {
   else for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + 2 * Math.PI * i / n; nodes.push({ x: 500 + 250 * Math.cos(a), y: 320 + 240 * Math.sin(a) }); }
   state.nodes = nodes; state.edges = edges; state.start = s < n ? s : 0; state.edgeFrom = null;
   resetPlay(); save(); render();
+}
+// The rectangles the legend and the hint cover, in canvas (svg) units: they are drawn over the canvas, not in it.
+function canvasCover() {
+  const out = [], canvas = $('#svg');
+  try {
+    const inverse = canvas.getScreenCTM().inverse();
+    const toCanvas = (x, y) => { const pt = canvas.createSVGPoint(); pt.x = x; pt.y = y; return pt.matrixTransform(inverse); };
+    for (const id of ['#legend', '#hint']) {
+      const b = $(id).getBoundingClientRect(), p = toCanvas(b.left, b.top), q = toCanvas(b.right, b.bottom);
+      if ([p.x, p.y, q.x, q.y].every(Number.isFinite)) out.push({ left: p.x, top: p.y, right: q.x, bottom: q.y });
+    }
+  } catch (e) { /* nothing to measure: the margins alone */ }
+  return out;
+}
+// The "random graph" option: replaces the canvas with a new random connected graph of the chosen size.  The rule,
+// the colours and the rows in use are left as they are.
+function makeRandomGraph() {
+  let g; try { g = randomGraph(Number($('#rn').value), Math.random); } catch (err) { alert(err.message); return; }
+  // Load the graph first: that draws the new play state, which can change the size of the canvas box (it does in the
+  // stacked layout of a narrow window), and the legend and the hint are fixed to the corners of that box.  Only then
+  // are they measured, and the vertices placed where neither covers them.
+  loadGraphText(g.text);
+  const area = layoutArea(canvasCover());
+  state.nodes = springLayout(g.n, g.edges, area.w, area.h, Math.random).map(([x, y]) => ({ x: area.x + x, y: area.y + y }));
+  save(); render();
 }
 
 // ------------------------------------------------------------ rule table helpers
@@ -801,6 +903,8 @@ $('#preset').addEventListener('change', (e) => { const v = e.target.value; e.tar
   }
   state.k = pr.k; $('#k').value = pr.k; loadGraphText(pr.text, pr.coords, pr.box); });
 $('#b-import-graph').addEventListener('click', () => { $('#graphtext').value = graphText(); $('#graphdialog').showModal(); });
+$('#b-random').addEventListener('click', makeRandomGraph);
+$('#rn').addEventListener('keydown', (e) => { if (e.key === 'Enter') makeRandomGraph(); });
 $('#b-graph-close').addEventListener('click', () => $('#graphdialog').close());
 $('#b-graph-apply').addEventListener('click', () => { try { loadGraphText($('#graphtext').value); $('#graphdialog').close(); } catch (err) { alert(err.message); } });
 $('#default').addEventListener('change', (e) => { state.def = e.target.value; if (state.def === 'agen6' && state.k < 6) { state.k = 6; $('#k').value = 6; } save(); resetPlay(); render(); });

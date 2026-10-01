@@ -18,12 +18,12 @@ let src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const head = '(async function () {', tail = /resetPlay\(\); render\(\);\n\}\)\(\);\s*$/;
 if (!src.includes(head) || !tail.test(src)) throw new Error('the page script no longer has the shape this test expects');
 src = src.replace(head, 'globalThis.__ready = ' + head).replace(tail, `resetPlay(); render();
-globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus };
+globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph };
 })();`);
 
 // a stand-in for an element: remembers what is set on it, answers every method with itself (and notes which were called)
 const elements = new Map();
-const calls = [];
+const calls = [], alerts = [];
 function element(sel) {
   if (elements.has(sel)) return elements.get(sel);
   const props = Object.create(null);
@@ -51,7 +51,7 @@ const sandbox = {
   document, Worker, console, setInterval, clearInterval, setTimeout, clearTimeout, Blob, URL, TextEncoder, TextDecoder,
   localStorage: { getItem: () => null, setItem() {} },
   fetch: async () => { const b = readFileSync(join(site, 'game.wasm')); return { ok: true, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; },
-  alert() {}, confirm: () => true,
+  alert: (m) => alerts.push(String(m)), confirm: () => true,
 };
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
@@ -178,6 +178,35 @@ const compiled = P.compileAlgo(P.ALGO_TEMPLATES.agen6, 6, 3);
 same([compiled.table.get('4.000010').rule, compiled.table.get('4.000010').target, compiled.stops], [9, -2, true], 'the template compiles with rule numbers and a stop');
 same(compiled.errors, [], 'and without rejected rows');
 same(compiled.table.has('2.000001'), false, 'fin rows stay undefined');
+
+// 9. the random graph option, as the button drives it: every size from 2 to 32 gives a graph on the canvas that the
+//    real engine accepts, with a fresh play at the start vertex; A_Gen6 explores each of them (Definition 1)
+Object.assign(P.state, { k: 6, def: 'agen6', table: new Map(), algoSrc: '', algo: null, algoError: null });
+const seenGraphs = new Set();
+for (let n = 2; n <= 32; n++) {
+  element('#rn').value = String(n); alerts.length = 0;
+  P.makeRandomGraph();
+  const { nodes, edges } = P.state, text = `${nodes.length} ${P.state.start} ${edges.map(([u, v]) => u + '-' + v).join(',')}`;
+  same([nodes.length, P.state.start, alerts.length], [n, 0, 0], `n=${n}: the canvas has the chosen number of vertices, start 0, no complaint`);
+  check(nodes.every((nd) => nd.x >= 50 && nd.x <= 950 && nd.y >= 40 && nd.y <= 600), `n=${n}: every vertex is on the canvas (the svg is 1000 by 640)`);
+  check(P.state.play && P.state.play.cur === 0 && P.state.play.steps.length === 0 && P.state.play.vis.size === 1, `n=${n}: a fresh play at the start vertex`);
+  const ans = P.engine(P.requestText('walks', { walks: 8 }));
+  same([ans.status, ans.model], ['unrefuted', 'paper'], `n=${n}: the engine accepts the graph (${text}) and A_Gen6 survives the walks`);
+  seenGraphs.add(text);
+}
+check(seenGraphs.size >= 20, `the button gives different graphs each time (${seenGraphs.size} different of 31)`);
+// the rule, the colours and the rows in use are left alone
+Object.assign(P.state, { k: 3, def: 'sigma', table: new Map([['0.10', { paint: 1, target: 0 }]]) });
+element('#rn').value = '6'; P.makeRandomGraph();
+same([P.state.k, P.state.def, P.state.table.size, P.state.nodes.length], [3, 'sigma', 1, 6], 'a new graph does not change the colours, the rule or the rows');
+// a size that is not 2 to 32 is refused with a message, and the graph on the canvas stays
+const graphOf = () => `${P.state.nodes.length} ${P.state.start} ${P.state.edges.map(([u, v]) => u + '-' + v).join(',')}`;
+setup({ k: 6, def: 'agen6', graph: '4 0 0-1,0-2,1-3' });
+for (const bad of ['', '0', '1', '33', '-4', '2.5', 'abc', '1e3']) {
+  element('#rn').value = bad; alerts.length = 0;
+  P.makeRandomGraph();
+  same([alerts, graphOf()], [['A random graph has 2 to 32 vertices.'], '4 0 0-1,0-2,1-3'], `"${bad}" vertices: refused, canvas unchanged`);
+}
 
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

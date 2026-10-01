@@ -26,6 +26,13 @@ or newer.
   (click; or double-click a vertex).  Keyboard `N E M D S`.  Up to 32
   vertices, degree at most 15.  Import/export as `n start u-v,u-v,...`, the
   `cegis` instance format; presets include the two hand-drawn sketches.
+* **Random graph.** The *random graph* box in the header takes a number of vertices (2 to 32) and *Generate*
+  (or Enter) replaces the canvas with a new random connected graph of that size: a random spanning tree plus up to
+  n/2 extra edges, so trees, cycles and denser graphs all turn up, never more than 15 neighbours at a vertex (the
+  engine's limit), start vertex 0, laid out by a spring layout so it can be read, inside the part of the canvas that the
+  legend (top right) and the hint bar (bottom left) do not cover; they are measured after the new graph is drawn, since
+  that can change the size of the canvas box.  The rule, the colours and the rows in
+  use are left alone.  A size outside 2 to 32 is refused with a message and the canvas stays as it was.
 * **Rules.** A table of `own.bag -> paint>target` rows (the `rule_final.txt`
   format, importable), plus a default for rows the table does not list:
   nothing (the play stops at the first undefined row and asks for its action,
@@ -81,7 +88,10 @@ The classic game keeps its own behaviour and wording.  `game-wasm/testdata/check
 both pages and holds the paper-model logic to the engine (for every paper-model fixture the page's verdict must equal
 the engine's reason and indicators); `check_page_play.mjs` runs the page's real script headlessly against the real
 engine and drives the Play tab (when a play ends, the banners and indicators, rule numbers, colour names, undo after a
-stop, replay); `check_wasm_parity.mjs` also requires the A_Gen6 presets to explore.
+stop, replay) and the random graph button (every size from 2 to 32 gives a graph the engine accepts, on which A_Gen6
+survives the walks); `check_page_logic.mjs` also checks the generator (connected, no repeated edge, at most 15 neighbours,
+different graphs each time, the extremes of the randomness) and that the layout puts no two vertices on top of each
+other; `check_wasm_parity.mjs` also requires the A_Gen6 presets to explore.
 
 ## Command line (`explore`)
 

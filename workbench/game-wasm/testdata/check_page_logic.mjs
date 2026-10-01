@@ -24,7 +24,7 @@ for (const [name, text] of [['site/index.html', html], ['docs/index.html', readF
 }
 const a = html.indexOf('// <page-logic>'), b = html.indexOf('// </page-logic>');
 if (a < 0 || b < a) throw new Error('the page-logic block was not found in site/index.html');
-const { paperStatus, colourLabel, colourHint, COLOUR_NEED, AGEN6_COLOURS, AGEN6_RULES } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, AGEN6_COLOURS, AGEN6_RULES };')();
+const { paperStatus, colourLabel, colourHint, COLOUR_NEED, AGEN6_COLOURS, AGEN6_RULES, randomGraph, springLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, AGEN6_COLOURS, AGEN6_RULES, randomGraph, springLayout, layoutArea };')();
 
 let bad = 0;
 const check = (ok, what) => { if (!ok) { bad++; console.log('FAIL  ' + what); } };
@@ -69,6 +69,69 @@ same(colourHint('flipsweep5', 4), { text: 'flipsweep5 needs at least 5 colours (
 same([colourHint('flipsweep5', 6).warn, colourHint('chase3', 2).warn, colourHint('eat3', 3).warn], [false, true, false], 'the boundary is k = n');
 same([colourHint('sigma', 2), colourHint('none', 5), colourHint('sweep', 3), colourHint(null, 6), colourHint('chasewhite', 2)], [null, null, null, null, null], 'rules that work with any number have no hint');
 same(Object.keys(COLOUR_NEED).sort(), ['agen6', 'chase3', 'eat3', 'flipsweep4', 'flipsweep4b', 'flipsweep5', 'flipsweep5d'], 'the rules with a stated need');
+
+// 2c. the random graph option: every size gives a connected graph the engine accepts, and a layout that can be read
+const seeded = (seed) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; // mulberry32
+const degrees = (n, edges) => { const d = new Array(n).fill(0); for (const [u, v] of edges) { d[u]++; d[v]++; } return d; };
+const reaches = (n, edges) => { const seen = new Set([0]), todo = [0]; while (todo.length) { const x = todo.pop(); for (const [u, v] of edges) { const y = u === x ? v : v === x ? u : -1; if (y >= 0 && !seen.has(y)) { seen.add(y); todo.push(y); } } } return seen.size === n; };
+let trees = 0, withCycles = 0, texts = new Set();
+for (let n = 2; n <= 32; n++) for (let seed = 1; seed <= 25; seed++) {
+  const g = randomGraph(n, seeded(n * 1000 + seed)), what = `n=${n} seed=${seed}`;
+  const [tn, ts, list] = g.text.split(' ');
+  const parsed = list.split(',').map((e) => e.split('-').map(Number));
+  check(+tn === n && ts === '0', `${what}: the text starts with the vertex count and start 0`);
+  same(parsed, g.edges, `${what}: the text is the edge list`);
+  check(parsed.every(([u, v]) => u < v && v < n && u >= 0), `${what}: edges join two different vertices of the graph, smaller first`);
+  check(new Set(parsed.map((e) => e.join('-'))).size === parsed.length, `${what}: no edge twice`);
+  check(reaches(n, parsed), `${what}: connected (the engine refuses a graph that is not)`);
+  check(Math.max(...degrees(n, parsed)) <= 15, `${what}: no vertex has more than 15 neighbours (the engine refuses it)`);
+  if (parsed.length === n - 1) trees++; else withCycles++;
+  texts.add(g.text);
+  if (seed <= 3) {
+    const pos = springLayout(n, g.edges, 900, 560, seeded(seed));
+    check(pos.length === n && pos.every(([x, y]) => Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= 900 && y >= 0 && y <= 560), `${what}: every vertex is placed inside the box`);
+    let closest = Infinity; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) closest = Math.min(closest, Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1]));
+    check(closest >= 40, `${what}: no two vertices drawn on top of each other (closest ${closest.toFixed(1)}, a vertex is 36 wide)`);
+    same(springLayout(n, g.edges, 900, 560, seeded(seed)), pos, `${what}: the same randomness gives the same layout`);
+  }
+}
+check(trees > 100 && withCycles > 100, `both trees (${trees}) and graphs with cycles (${withCycles}) turn up`);
+check(texts.size > 700, `the graphs differ from one another (${texts.size} different of 775)`);
+same(randomGraph(2, seeded(1)).text, '2 0 0-1', 'two vertices: the one edge');
+// the extremes of the randomness: always the first choice, always the last, and a neighbour limit that has to be respected
+for (const [name, rnd] of [['always 0', () => 0], ['always the largest', () => 1 - 2 ** -53]]) {
+  const g = randomGraph(32, rnd);
+  check(reaches(32, g.edges) && Math.max(...degrees(32, g.edges)) <= 15, `${name}: still connected, still at most 15 neighbours`);
+}
+same(Math.max(...degrees(32, randomGraph(32, () => 0).edges)), 15, 'always the first choice would make a star: it stops at 15 neighbours');
+for (const bad of [0, 1, 33, -3, 2.5, NaN, Infinity, '5', null, undefined]) {
+  let message = null; try { randomGraph(bad, Math.random); } catch (e) { message = e.message; }
+  check(message === 'A random graph has 2 to 32 vertices.', `${String(bad)} vertices is refused with a message (got ${message})`);
+}
+
+// the layout also has to work in the smaller areas that layoutArea can give (down to 250 units high)
+for (const h of [250, 435]) for (const n of [2, 9, 16, 24, 32]) for (let seed = 1; seed <= 10; seed++) {
+  const g = randomGraph(n, seeded(n * 77 + seed)), pos = springLayout(n, g.edges, 900, h, seeded(seed)), what = `area 900x${h}, n=${n}, seed=${seed}`;
+  check(pos.every(([x, y]) => x >= 0 && x <= 900 && y >= 0 && y <= h), `${what}: inside the area`);
+  let closest = Infinity; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) closest = Math.min(closest, Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1]));
+  check(closest >= 40, `${what}: no two vertices on top of each other (closest ${closest.toFixed(1)})`);
+}
+
+// 2d. where a random graph may go: clear of the legend (top right) and the hint (bottom left), which are drawn over the canvas
+const legend = { left: 700, right: 990, top: 10, bottom: 61 }, hint = { left: 12, right: 370, top: 580, bottom: 630 };
+same(layoutArea([]), { x: 50, y: 40, w: 900, h: 560 }, 'nothing covered: the usual margins');
+same(layoutArea([legend]), { x: 50, y: 103, w: 900, h: 497 }, 'the legend pushes the top edge down, a halo and a little more below it');
+same(layoutArea([hint]), { x: 50, y: 40, w: 900, h: 498 }, 'the hint pushes the bottom edge up');
+same(layoutArea([legend, hint]), { x: 50, y: 103, w: 900, h: 435 }, 'both');
+same(layoutArea([hint, legend]), layoutArea([legend, hint]), 'in either order');
+same(layoutArea([{ ...legend, left: 1010, right: 1300 }, { ...hint, left: -300, right: -10 }]), layoutArea([]), 'boxes beside the canvas (it is letterboxed in a wide window) cost nothing');
+same(layoutArea([{ left: 700, right: 990, top: -90, bottom: -40 }]), layoutArea([]), 'a box above the canvas costs nothing');
+same(layoutArea([{ left: 0, right: 1000, top: 0, bottom: 300 }, { left: 0, right: 1000, top: 340, bottom: 640 }]), layoutArea([]), 'if that would leave too little room, the margins alone');
+for (const [what, cover] of [['legend', [legend]], ['hint', [hint]], ['both', [legend, hint]], ['tall legend and hint', [{ ...legend, bottom: 150 }, { ...hint, top: 520 }]]]) {
+  const area = layoutArea(cover);
+  check(area.h >= 250 && area.y >= 40 && area.y + area.h <= 600 && area.x === 50 && area.x + area.w === 950, `${what}: the area is inside the margins and tall enough for 32 vertices`);
+  for (const r of cover) check(!(r.bottom + 34 > area.y && r.top < area.y) && !(r.top - 34 < area.y + area.h && r.bottom > area.y + area.h), `${what}: a vertex on the area's edge, with its halo, clears the box`);
+}
 
 // 3. the page's verdict against the engine's, on every paper-model fixture with a trace
 const dir = join(here, 'fixtures');
