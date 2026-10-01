@@ -389,7 +389,7 @@ function loadGraphText(text, coords, box) {
   if (coords) { const [bw, bh] = box; const sc = Math.min(900 / bw, 560 / bh); for (const [x, y] of coords) nodes.push({ x: 50 + x * sc, y: 40 + y * sc }); }
   else for (let i = 0; i < n; i++) { const a = -Math.PI / 2 + 2 * Math.PI * i / n; nodes.push({ x: 500 + 250 * Math.cos(a), y: 320 + 240 * Math.sin(a) }); }
   state.nodes = nodes; state.edges = edges; state.start = s < n ? s : 0; state.edgeFrom = null;
-  resetPlay(); save(); render();
+  forgetAnalysis(); resetPlay(); save(); render();
 }
 // The rectangles the legend and the hint cover, in canvas (svg) units: they are drawn over the canvas, not in it.
 function canvasCover() {
@@ -842,6 +842,15 @@ function traceSummary(r) {
   if (r.status === 'fails') return `<div class="banner bad"><b>Fails.</b> ${r.method === 'exact game' ? `Exact game over ${r.positions.toLocaleString()} positions: the adversary has a strategy that never visits <b>${t.unvisited.map(NAMES).join(', ')}</b>.` : `Found by an adversary ${r.method}: <b>${t.unvisited.map(NAMES).join(', ')}</b> never visited.`} The trapping execution has ${t.steps.length} steps, the last ${t.steps.length - t.repeat_at} repeating for ever.</div>`;
   return '';
 }
+// Stop a search that is still running (the worker is started afresh) and put `html` in the Analysis tab.
+function cancelAnalysis(html) {
+  startWorker(); pending.clear();
+  $('#analysis').innerHTML = html;
+  $('#b-exact').disabled = false; $('#b-walks').disabled = false; $('#b-cancel').disabled = true;
+}
+// Whatever the Analysis tab shows, or is still computing, was for the graph that has just been replaced: its text
+// and its "Load this execution" button would be about a graph that is no longer there.
+function forgetAnalysis() { if (pending.size) cancelAnalysis(''); else $('#analysis').innerHTML = ''; }
 async function analyse(cmd) {
   if (!engine || !state.play) return;
   const out = $('#analysis'); out.innerHTML = '<div class="banner neutral">Running…</div>'; $('#b-exact').disabled = true; $('#b-walks').disabled = true; $('#b-cancel').disabled = false;
@@ -896,7 +905,7 @@ svg.addEventListener('dblclick', (evt) => { const nodeEl = evt.target.closest('.
 document.querySelectorAll('header [data-mode]').forEach((b) => b.addEventListener('click', () => { state.mode = b.dataset.mode; state.edgeFrom = null; document.querySelectorAll('header [data-mode]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); render(); }));
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 $('#k').addEventListener('change', (e) => { state.k = +e.target.value; let dropped = 0; for (const [r, a] of [...state.table.entries()]) { const own = +r.split('.')[0], bag = r.split('.')[1]; if (own >= state.k || a.paint >= state.k || a.target >= state.k || bag.length > state.k || [...bag].some((d, i) => i >= state.k && d !== '0')) { state.table.delete(r); dropped++; } } if (dropped) flash(`${dropped} table rows used colours beyond the new palette and were removed.`); save(); resetPlay(); render(); });
-$('#preset').addEventListener('change', (e) => { const v = e.target.value; e.target.value = ''; if (!v) return; if (v === 'clear') { state.nodes = []; state.edges = []; state.start = 0; resetPlay(); save(); render(); return; } const pr = PRESETS[v];
+$('#preset').addEventListener('change', (e) => { const v = e.target.value; e.target.value = ''; if (!v) return; if (v === 'clear') { state.nodes = []; state.edges = []; state.start = 0; forgetAnalysis(); resetPlay(); save(); render(); return; } const pr = PRESETS[v];
   if (pr.def) { // the preset brings its own rule: rows and code in use would win over it, so they go
     if ((state.table.size || state.algoSrc) && !confirm(`This preset uses the rule ${pr.def}. It replaces the rule you have in use (${state.table.size} defined row${state.table.size === 1 ? '' : 's'}${state.algoSrc ? ' and the algorithm' : ''}). Continue?`)) return;
     state.def = pr.def; state.table = new Map(); state.algoSrc = ''; state.algo = null; state.algoError = null;
@@ -940,7 +949,7 @@ $('#b-play').addEventListener('click', () => { togglePlay(); });
 $('#speed').addEventListener('input', () => { if (state.timer) { stopPlay(); togglePlay(); } });
 $('#b-exact').addEventListener('click', () => analyse('exact'));
 $('#b-walks').addEventListener('click', () => analyse('walks'));
-$('#b-cancel').addEventListener('click', () => { startWorker(); pending.clear(); $('#analysis').innerHTML = '<div class="banner neutral">Cancelled.</div>'; $('#b-exact').disabled = false; $('#b-walks').disabled = false; $('#b-cancel').disabled = true; });
+$('#b-cancel').addEventListener('click', () => cancelAnalysis('<div class="banner neutral">Cancelled.</div>'));
 document.addEventListener('keydown', (e) => {
   if (['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName) || $('#graphdialog').open) return;
   const modes = { n: 'node', e: 'edge', m: 'move', d: 'delete', s: 'start' };

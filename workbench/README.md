@@ -32,7 +32,9 @@ or newer.
   engine's limit), start vertex 0, laid out by a spring layout so it can be read, inside the part of the canvas that the
   legend (top right) and the hint bar (bottom left) do not cover; they are measured after the new graph is drawn, since
   that can change the size of the canvas box.  The rule, the colours and the rows in
-  use are left alone.  A size outside 2 to 32 is refused with a message and the canvas stays as it was.
+  use are left alone.  A size outside 2 to 32 is refused with a message and the canvas stays as it was.  Replacing the
+  whole graph (this option, a preset, Import) also clears the Analysis tab and cancels a search still running, since
+  a result belongs to the graph it was computed for.
 * **Rules.** A table of `own.bag -> paint>target` rows (the `rule_final.txt`
   format, importable), plus a default for rows the table does not list:
   nothing (the play stops at the first undefined row and asks for its action,

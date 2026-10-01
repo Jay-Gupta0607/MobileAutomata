@@ -18,7 +18,7 @@ let src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const head = '(async function () {', tail = /resetPlay\(\); render\(\);\n\}\)\(\);\s*$/;
 if (!src.includes(head) || !tail.test(src)) throw new Error('the page script no longer has the shape this test expects');
 src = src.replace(head, 'globalThis.__ready = ' + head).replace(tail, `resetPlay(); render();
-globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph };
+globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph, analyse };
 })();`);
 
 // a stand-in for an element: remembers what is set on it, answers every method with itself (and notes which were called)
@@ -46,7 +46,9 @@ function element(sel) {
   return el;
 }
 const document = { querySelector: (s) => element(s), querySelectorAll: () => [], activeElement: null, addEventListener() {} };
-class Worker { constructor() {} postMessage() {} terminate() {} }
+// a worker that starts (answers 'init') but never finishes a search, so a search can be "running" while the test acts
+let workersStarted = 0;
+class Worker { constructor() { workersStarted++; } postMessage(m) { if (m.type === 'init') queueMicrotask(() => this.onmessage({ data: { type: 'ready' } })); } terminate() {} }
 const sandbox = {
   document, Worker, console, setInterval, clearInterval, setTimeout, clearTimeout, Blob, URL, TextEncoder, TextDecoder,
   localStorage: { getItem: () => null, setItem() {} },
@@ -208,5 +210,24 @@ for (const bad of ['', '0', '1', '33', '-4', '2.5', 'abc', '1e3']) {
   same([alerts, graphOf()], [['A random graph has 2 to 32 vertices.'], '4 0 0-1,0-2,1-3'], `"${bad}" vertices: refused, canvas unchanged`);
 }
 
+// 10. what the Analysis tab shows belongs to the graph it was computed for: replacing the whole graph (the random graph
+//     button, a preset, Import) clears it, and cancels a search that is still running for the old graph.  Before this,
+//     "Load this execution" stayed on the page and replayed the old graph's trace on the new graph ("Trapped").
+const analysis = () => String(element('#analysis').innerHTML), buttons = () => [element('#b-exact').disabled, element('#b-cancel').disabled];
+setup({ k: 6, def: 'agen6', graph: '4 0 0-1,0-2,1-3' });
+element('#analysis').innerHTML = '<div class="banner bad"><b>Fails.</b></div><button id="b-load-trace">Load this execution into the player</button>';
+const started = workersStarted;
+element('#rn').value = '9'; P.makeRandomGraph();
+same(analysis(), '', 'a finished result is gone once a random graph replaces the canvas');
+same(workersStarted, started, 'and no search was running, so the worker is left alone');
+element('#analysis').innerHTML = '<div class="banner good">Explores</div>';
+P.loadGraphText('3 0 0-1,1-2');
+same(analysis(), '', 'loading a graph from text (Import, presets) clears it too');
+// a search that is still running
+P.analyse('exact');
+await new Promise((res) => setTimeout(res, 0));
+same([buttons(), analysis().includes('Running')], [[true, false], true], 'a search is running: search disabled, cancel enabled');
+P.makeRandomGraph();
+same([buttons(), analysis(), workersStarted > started], [[false, true], '', true], 'a new graph cancels it: buttons back, panel empty, a fresh worker');
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)
