@@ -1,0 +1,5 @@
+cmd play
+k 4
+graph 5 0 0-1,1-2,2-3,3-4,1-4
+default ac4
+prefer 2 3 4 1 0

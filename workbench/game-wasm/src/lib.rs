@@ -262,6 +262,15 @@ pub enum Formula {
     /// A_Gen6 of Takahashi et al. (arXiv 2505.02789, Algorithm 2): six colours,
     /// simulates a semi-DFS and stops on the start vertex
     AGen6,
+    /// A_TC3 of Hiraoka, Imori, Takahashi and Sudo (arXiv 2609.14356, Algorithm 1): three colours,
+    /// every tree and every simple cycle
+    ATC3,
+    /// A_C4 (same paper, Algorithm 2): four colours, every graph whose blocks are cycles or
+    /// complete bipartite graphs (so every cactus)
+    AC4,
+    /// A_US5 (same paper, Algorithm 3): five colours, every graph whose blocks are cliques or
+    /// triangle-free; a semi-DFS like A_Gen6
+    AUS5,
 }
 
 impl Formula {
@@ -311,13 +320,220 @@ impl Formula {
         })
     }
 
-    /// The number of the paper's rule that answers `row`, for the formulas that have numbered rules
-    /// (A_Gen6 only).
-    pub fn rule_number(&self, row: &Row, k: u8) -> Option<u8> {
+    /// A_TC3 (Algorithm 1 of Hiraoka et al.): the action on `row` and the number of the paper's rule (D1 to D11)
+    /// that gave it; `None` where the paper gives no output, which it proves unreachable (an ℓ0 or ℓ1 vertex
+    /// seeing neither of the neighbours listed).  Within one own colour the first matching rule wins ("else if").
+    /// Colours: 0 init, 1 l0 (the paper's ℓ0), 2 l1 (ℓ1).
+    fn atc3(row: &Row) -> Option<(Action, u8)> {
+        const INIT: u8 = 0;
+        const L0: u8 = 1;
+        const L1: u8 = 2;
+        let mv = |paint: u8, target: u8| Action { paint, target };
+        let has = |c: u8| row.present(c);
+        Some(match row.own {
+            INIT => {
+                if !has(INIT) && !has(L0) && !has(L1) {
+                    (mv(L1, STOP), 1) // D1: no neighbour at all (the start vertex of a graph with one vertex)
+                } else if has(INIT) && !has(L0) && !has(L1) {
+                    (mv(L0, INIT), 2) // D2: the start vertex, every neighbour init
+                } else if has(INIT) && has(L0) {
+                    (mv(L1, INIT), 3) // D3: probe an init child
+                } else if has(INIT) && has(L1) {
+                    (mv(INIT, L1), 4) // D4: the probed child has children: undo and go back
+                } else if has(L1) {
+                    (mv(L1, L1), 5) // D5: the probed child is a leaf: finish it and go back
+                } else if has(L0) {
+                    (mv(L1, L0), 6) // D6: a leaf entered from an l0 parent
+                } else {
+                    return None;
+                }
+            }
+            L0 => {
+                if has(INIT) && has(L1) {
+                    (mv(L0, INIT), 7)
+                } else if has(L0) && has(L1) {
+                    (mv(L1, L0), 8)
+                } else if has(L1) && !has(INIT) && !has(L0) {
+                    (mv(L1, STOP), 9)
+                } else {
+                    return None;
+                }
+            }
+            L1 => {
+                if has(INIT) && has(L0) {
+                    (mv(L0, INIT), 10)
+                } else if has(L0) && has(L1) {
+                    (mv(L1, L0), 11)
+                } else {
+                    return None;
+                }
+            }
+            _ => return None,
+        })
+    }
+
+    /// A_C4 (Algorithm 2 of Hiraoka et al.): the action on `row` and the number of the paper's rule (C1 to C14)
+    /// that gave it; `None` for a fin vertex (the paper has no rule for it: fin is never requested, so the agent is
+    /// never on one) and for the observations the paper proves unreachable (an init vertex seeing only init and fin).
+    /// Rules C1 and C2 look only at the neighbours and apply to every own colour but fin; then the rules of the own colour.
+    /// Colours: 0 init, 1 fin, 2 front, 3 path.
+    fn ac4(row: &Row) -> Option<(Action, u8)> {
+        const INIT: u8 = 0;
+        const FIN: u8 = 1;
+        const FRONT: u8 = 2;
+        const PATH: u8 = 3;
+        let mv = |paint: u8, target: u8| Action { paint, target };
+        let has = |c: u8| row.present(c);
+        if row.own == FIN || row.own > PATH {
+            return None;
+        }
+        if !has(INIT) && !has(FRONT) && !has(PATH) {
+            return Some((mv(FIN, STOP), 1)); // C1: everything around is finished (or nothing is): stop
+        }
+        if !has(FIN) && !has(FRONT) && !has(PATH) {
+            return Some((mv(FRONT, INIT), 2)); // C2: every neighbour init: the start of a block
+        }
+        Some(match row.own {
+            INIT => {
+                if !has(FRONT) && !has(INIT) {
+                    (mv(FIN, PATH), 3)
+                } else if !has(INIT) {
+                    (mv(FIN, FRONT), 4)
+                } else if has(FRONT) && has(PATH) {
+                    (mv(PATH, INIT), 5)
+                } else if has(PATH) {
+                    (mv(FRONT, INIT), 6)
+                } else if has(FRONT) {
+                    (mv(FRONT, FRONT), 7)
+                } else {
+                    return None;
+                }
+            }
+            FRONT => {
+                if has(FRONT) {
+                    (mv(PATH, FRONT), 8)
+                } else if has(INIT) {
+                    (mv(FRONT, INIT), 9)
+                } else {
+                    (mv(FIN, PATH), 10)
+                }
+            }
+            _ => {
+                // PATH
+                if !has(FRONT) && has(INIT) {
+                    (mv(FRONT, INIT), 11)
+                } else if has(FRONT) && has(INIT) {
+                    (mv(PATH, INIT), 12)
+                } else if has(FRONT) {
+                    (mv(FIN, FRONT), 13)
+                } else {
+                    (mv(FIN, PATH), 14)
+                }
+            }
+        })
+    }
+
+    /// A_US5 (Algorithm 3 of Hiraoka et al.): the action on `row` and the number of the paper's rule (U1 to U19)
+    /// that gave it; `None` for a fin vertex (never requested, so never occupied).  It simulates the same semi-DFS
+    /// as A_Gen6 with five colours: rules U1, U3-U5, U7-U13, U17 and U19 are the rules of Takahashi et al.'s
+    /// triangle-free algorithm, U2, U6, U14-U16 and U18 are new.  Within one own colour the first matching rule wins.
+    /// Colours: 0 init, 1 path, 2 neigh, 3 fin, 4 head.
+    fn aus5(row: &Row) -> Option<(Action, u8)> {
+        const INIT: u8 = 0;
+        const PATH: u8 = 1;
+        const NEIGH: u8 = 2;
+        const FIN: u8 = 3;
+        const HEAD: u8 = 4;
+        let mv = |paint: u8, target: u8| Action { paint, target };
+        let has = |c: u8| row.present(c);
+        Some(match row.own {
+            INIT => {
+                if has(INIT) && !has(PATH) && !has(NEIGH) && !has(FIN) && !has(HEAD) {
+                    (mv(PATH, INIT), 1)
+                } else if has(NEIGH) && !has(HEAD) {
+                    (mv(PATH, STAY), 2)
+                } else if has(HEAD) && has(PATH) {
+                    (mv(NEIGH, HEAD), 3)
+                } else if has(HEAD) && !has(PATH) {
+                    (mv(HEAD, HEAD), 4)
+                } else {
+                    (mv(HEAD, STAY), 5)
+                }
+            }
+            HEAD => {
+                if has(INIT) && has(NEIGH) && !has(PATH) && !has(HEAD) {
+                    (mv(FIN, INIT), 6)
+                } else if has(HEAD) && has(NEIGH) {
+                    (mv(HEAD, NEIGH), 7)
+                } else if has(HEAD) && has(PATH) {
+                    (mv(PATH, HEAD), 8)
+                } else if has(HEAD) {
+                    (mv(FIN, HEAD), 9)
+                } else if has(PATH) && has(INIT) {
+                    (mv(HEAD, INIT), 10)
+                } else if has(PATH) {
+                    (mv(HEAD, PATH), 11)
+                } else if has(INIT) {
+                    (mv(PATH, INIT), 12)
+                } else {
+                    (mv(FIN, STOP), 13)
+                }
+            }
+            PATH => {
+                if has(NEIGH) && has(HEAD) {
+                    (mv(INIT, HEAD), 14)
+                } else if has(NEIGH) {
+                    (mv(PATH, NEIGH), 15)
+                } else if !has(HEAD) {
+                    (mv(HEAD, STAY), 16)
+                } else {
+                    (mv(HEAD, HEAD), 17)
+                }
+            }
+            NEIGH => {
+                if has(PATH) && !has(HEAD) {
+                    (mv(INIT, PATH), 18)
+                } else {
+                    (mv(INIT, HEAD), 19)
+                }
+            }
+            _ => return None, // fin (and colours beyond the palette)
+        })
+    }
+
+    /// The algorithms of the papers: the name a request uses and the number of colours each needs (a palette
+    /// with more colours leaves the others unused).  `None` for the other formulas.  These algorithms stop
+    /// the agent, so a request that names one is judged by the paper's model unless it asks otherwise.
+    pub fn paper_algorithm(&self) -> Option<(&'static str, u8)> {
         match self {
-            Formula::AGen6 if k >= 6 => Formula::agen6(row).map(|(_, n)| n),
+            Formula::AGen6 => Some(("agen6", 6)),
+            Formula::ATC3 => Some(("atc3", 3)),
+            Formula::AC4 => Some(("ac4", 4)),
+            Formula::AUS5 => Some(("aus5", 5)),
             _ => None,
         }
+    }
+
+    /// The action on `row` and the number of the paper's rule behind it, for the paper's algorithms
+    /// (with fewer colours than the algorithm needs there is no answer).
+    fn numbered(&self, row: &Row, k: u8) -> Option<(Action, u8)> {
+        let (_, need) = self.paper_algorithm()?;
+        if k < need {
+            return None;
+        }
+        match self {
+            Formula::AGen6 => Formula::agen6(row),
+            Formula::ATC3 => Formula::atc3(row),
+            Formula::AC4 => Formula::ac4(row),
+            Formula::AUS5 => Formula::aus5(row),
+            _ => None,
+        }
+    }
+
+    /// The number of the paper's rule that answers `row`, for the formulas that have numbered rules
+    /// (the paper's algorithms).
+    pub fn rule_number(&self, row: &Row, k: u8) -> Option<u8> {
+        self.numbered(row, k).map(|(_, n)| n)
     }
 
     pub fn parse(name: &str) -> Option<Formula> {
@@ -332,6 +548,9 @@ impl Formula {
             "chase3" => Formula::Chase3,
             "chasewhite" | "chase" => Formula::ChaseWhite,
             "agen6" => Formula::AGen6,
+            "atc3" => Formula::ATC3,
+            "ac4" => Formula::AC4,
+            "aus5" => Formula::AUS5,
             _ => {
                 let body = name.strip_prefix("sweep")?;
                 let body = body.trim_start_matches(['(', ':']).trim_end_matches(')');
@@ -574,12 +793,7 @@ impl Formula {
                 }
                 Some(if row.present(S) { mv(F, S) } else { first(row, F, &[F]) })
             }
-            Formula::AGen6 => {
-                if k < 6 {
-                    return None;
-                }
-                Formula::agen6(row).map(|(a, _)| a)
-            }
+            Formula::AGen6 | Formula::ATC3 | Formula::AC4 | Formula::AUS5 => self.numbered(row, k).map(|(a, _)| a),
         }
     }
 }
@@ -1092,7 +1306,7 @@ fn err(msg: &str) -> String {
 /// `budget`, `colours` (space-separated, for `step`), `cur`, `vis`
 /// (space-separated visited vertices), `row` (for `answer`), `model`
 /// (`classic` or `paper`; default `classic`, or `paper` when the default rule
-/// is `agen6`); the block
+/// is one of the papers' algorithms: `agen6`, `atc3`, `ac4`, `aus5`); the block
 /// between a line `table` and a line `end` lists `row action` pairs.
 struct Request {
     cmd: String,
@@ -1182,14 +1396,14 @@ fn parse_request(input: &str) -> Request {
 }
 
 /// Whether the request runs the paper's model (see `Rule::terminating`).
-/// With no `model` key it is the paper model whenever the rule can stop (`default agen6`,
-/// or a table row answering `stop`): judged as the classic game a stop would silently mean
+/// With no `model` key it is the paper model whenever the rule can stop (`default agen6` or another
+/// algorithm of the papers, or a table row answering `stop`): judged as the classic game a stop would silently mean
 /// "stay" and the verdict would ignore where, or whether, the agent stops.
 fn resolve_model(model: &str, default: &Option<Formula>, table_can_stop: bool) -> Result<bool, String> {
     match model {
         "paper" => Ok(true),
         "classic" => Ok(false),
-        "" => Ok(table_can_stop || matches!(default, Some(Formula::AGen6))),
+        "" => Ok(table_can_stop || default.as_ref().map_or(false, |f| f.paper_algorithm().is_some())),
         other => Err(format!("unknown model {} (classic or paper)", other)),
     }
 }
@@ -1202,8 +1416,10 @@ pub fn handle(input: &str) -> String {
     if let Some(bad) = &r.bad_default {
         return err(&format!("unknown default rule {}", bad));
     }
-    if matches!(r.default, Some(Formula::AGen6)) && r.k < 6 {
-        return err("agen6 needs 6 colours (k 6)");
+    if let Some((name, need)) = r.default.as_ref().and_then(|f| f.paper_algorithm()) {
+        if r.k < need {
+            return err(&format!("{} needs {} colours (k {})", name, need, need));
+        }
     }
     if !r.bad_rows.is_empty() {
         return err(&format!("bad table line: {}", r.bad_rows[0]));
@@ -1314,6 +1530,9 @@ pub unsafe extern "C" fn free_result(ptr: *mut u8) {
     let n = u32::from_le_bytes([*ptr, *ptr.add(1), *ptr.add(2), *ptr.add(3)]) as usize;
     drop(Vec::from_raw_parts(ptr, 0, n + 4));
 }
+
+#[cfg(test)]
+mod paper_tests;
 
 #[cfg(test)]
 mod tests {

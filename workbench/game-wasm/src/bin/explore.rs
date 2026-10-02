@@ -22,11 +22,16 @@ graph
   --preset NAME       sketch1
 
 rule
-  --rule NAME         default rule: sigma, agen6, chasewhite, chase3, eat3, flipsweep4, flipsweep4b,
-                      flipsweep5, flipsweep5d, sweep(c,t,p), none  (default: none)
+  --rule NAME         default rule: sigma, chasewhite, chase3, eat3, flipsweep4, flipsweep4b, flipsweep5,
+                      flipsweep5d, sweep(c,t,p), none  (default: none), or an algorithm of the papers:
+                        agen6  any graph, 6 colours (Takahashi et al., arXiv 2505.02789)
+                        atc3   trees and simple cycles, 3 colours (Hiraoka et al., arXiv 2609.14356)
+                        ac4    blocks that are cycles or complete bipartite (cacti), 4 colours (same paper)
+                        aus5   blocks that are cliques or triangle-free, 5 colours (same paper)
   --table FILE        rows `own.bag paint>target`, one per line; # starts a comment; target is a
                       colour, stay or stop.  Rows in the table win over --rule
-  --k N               number of colours, 2 to 6 (default 5; agen6 needs 6)
+  --k N               number of colours, 2 to 6 (default 5; the algorithms of the papers set their own
+                      number, which is also the least they accept)
   --model MODEL       classic or paper (default: paper when the rule can stop, else classic)
 
 search
@@ -194,8 +199,8 @@ fn build_request(a: &Args) -> Result<String, String> {
     let mut r = format!("cmd {}\n", a.command);
     if let Some(k) = &a.k {
         r += &format!("k {}\n", number("--k", k, 2, 6)?);
-    } else if a.rule.as_deref() == Some("agen6") {
-        r += "k 6\n";
+    } else if let Some((_, k)) = a.rule.as_deref().and_then(game_wasm::Formula::parse).and_then(|f| f.paper_algorithm()) {
+        r += &format!("k {}\n", k); // an algorithm of the papers brings its own number of colours
     }
     if a.command != "answer" {
         let g = a.graph.as_deref().ok_or("--graph (or --graph-file, --preset) is required")?;

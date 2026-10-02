@@ -1,0 +1,4 @@
+cmd exact
+k 3
+graph 4 0 0-1,1-2,0-2,2-3
+default atc3

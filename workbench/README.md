@@ -111,7 +111,7 @@ native run and a browser run answer identically.  From `game-wasm/`:
 Commands: `exact` (every adversary), `walks`, `play` (one adversary, named by `--prefer`), `answer` (the
 action for one row).  The graph comes from `--graph "n s u-v,..."`, `--graph-file FILE` or `--preset sketch1`
 (edge pieces may be separated by spaces or line breaks).  The rule is `--rule NAME` (a formula such as `sigma` or
-`agen6`), `--table FILE` (rows `own.bag paint>target`, `#` comments), or both (table rows win).  Also `--k`
+`agen6`, `atc3`, `ac4`, `aus5`; each of the last four sets its own `--k`), `--table FILE` (rows `own.bag paint>target`, `#` comments), or both (table rows win).  Also `--k`
 (2 to 6), `--model classic|paper`, `--cap` (exact only, 1000 to 12000000), `--walks` (walks only, 0 to
 100000), `--budget` (walks and play, 10 to 5000000), `--prefer` (play only), `--row` (answer only): an option
 that does not belong to the command, or a value outside its range, is an error rather than being adjusted
@@ -165,10 +165,10 @@ model of Takahashi et al. (arXiv 2505.02789, Section 2): `stop` ends the run
 after painting the vertex, and the agent explores only if it stops **on the
 start vertex with every vertex visited**; a play that never stops, stops
 elsewhere, or stops before everything is visited is a failure.  With no
-`model` key the paper model is used whenever the rule can stop: `default
-agen6` (A_Gen6, Algorithm 2, colours 0 init, 1 path, 2 fin, 3 head1, 4 head2,
-5 neigh; needs `k 6`) or a table row answering `stop`.  A colour target that
-no neighbour has still leaves the agent in place in both models.
+`model` key the paper model is used whenever the rule can stop: `default`
+one of the algorithms of the papers (next section) or a table row answering
+`stop`.  A colour target that no neighbour has still leaves the agent in place
+in both models.
 
 Every `exact`/`walks` answer carries `"model"`, and each trace carries
 `stopped_at` (the vertex the agent stopped on, or null; a `stop` action is
@@ -176,3 +176,28 @@ reported as target `-2`, `stay` as `-1`).  In the paper model an
 `explores`/`fails` answer also carries `indicators` `{visited_all, stopped,
 stopped_at_start}` and a failure a `reason`: `never_stops`, `stopped_early`
 or `stopped_off_start`.
+
+### The algorithms of the papers (`default NAME`)
+
+Four rules are built in as named formulas.  Each is one rule function of the model of the papers, with the paper's
+own rule numbers (an answer for a row carries `"rule": N`, and the page and the ledger show it).
+
+| name | from | colours (numbers) | explores | moves |
+|---|---|---|---|---|
+| `agen6` | Takahashi et al., arXiv 2505.02789, Algorithm 2 | 6: 0 init, 1 path, 2 fin, 3 head1, 4 head2, 5 neigh | every graph | |
+| `atc3` | Hiraoka, Imori, Takahashi, Sudo, arXiv 2609.14356, Algorithm 1 (rules D1-D11) | 3: 0 init, 1 l0, 2 l1 | every tree and every simple cycle | O(n) |
+| `ac4` | same paper, Algorithm 2 (rules C1-C14) | 4: 0 init, 1 fin, 2 front, 3 path | graphs whose blocks are cycles or complete bipartite graphs (all cacti) | O(n) |
+| `aus5` | same paper, Algorithm 3 (rules U1-U19) | 5: 0 init, 1 path, 2 neigh, 3 fin, 4 head | graphs whose blocks are cliques or triangle-free (all unichord-free graphs) | O(nΔ) |
+
+The paper model is chosen for them without being asked.  Fewer colours than an algorithm needs is an error
+(`atc3 needs 3 colours (k 3)`); more are left unused.  Where the paper gives no output the row is undefined: a `fin`
+vertex (the agent is never on one: no rule requests `fin`), and the observations the papers prove unreachable, such as
+an `l0` vertex seeing only `init` neighbours in A_TC3.  `stay` and `stop` are the engine's `stay` and `stop` targets.
+
+How the transcription of the second paper is checked (`src/paper_tests.rs`, run by `cargo test`): every rule on a row
+derived by hand; the two traces of Figure 2 of the paper for A_C4, whose rule sequences the figure prints; every
+connected graph of up to seven vertices, up to isomorphism, from every start vertex and against every adversary
+(167, 776 and 1,117 graph-and-start pairs in the three classes, all explored); a scan of every reachable position for
+an undefined row or a request for a colour no neighbour has, which the paper counts as a failure but the engine would
+turn into a stay (none occurs); failures outside the classes (A_TC3 fails on a triangle with a pendant vertex, as
+Theorem 13 of the paper requires of any three-colour rule; A_US5 on the diamond, A_C4 on K4).

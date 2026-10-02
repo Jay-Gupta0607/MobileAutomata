@@ -320,3 +320,29 @@ fn two_rules_on_one_table_line_are_an_error_not_a_silent_loss() {
     assert_eq!(code(&o), 64, "{}", stdout(&o));
     assert!(stdout(&o).contains("bad table line"), "{}", stdout(&o));
 }
+
+#[test]
+fn the_algorithms_of_the_second_paper_bring_their_colours_and_explore_their_classes() {
+    // (rule, its colours, a graph of its class): a 5-cycle, a bridge with a 4-cycle, the clique K4
+    for (rule, k, graph) in [("atc3", 3, "5 0 0-1,1-2,2-3,3-4,0-4"), ("ac4", 4, "5 0 0-1,1-2,2-3,3-4,1-4"), ("aus5", 5, "4 0 0-1,0-2,0-3,1-2,1-3,2-3")] {
+        // without --k the rule's own number of colours goes into the request
+        let req = run(&["exact", "--graph", graph, "--rule", rule, "--request"]);
+        assert!(stdout(&req).lines().any(|l| l == format!("k {}", k)), "{}: {}", rule, stdout(&req));
+        let o = run(&["exact", "--graph", graph, "--rule", rule, "--summary"]);
+        assert_eq!(code(&o), 0, "{}: {}", rule, stdout(&o));
+        assert!(stdout(&o).starts_with("explores (paper model)") && stdout(&o).contains("stopped on vertex 0"), "{}: {}", rule, stdout(&o));
+        // one colour fewer is an error that names the rule and its number
+        let few = run(&["exact", "--graph", graph, "--k", &(k - 1).to_string(), "--rule", rule, "--summary"]);
+        assert_eq!(code(&few), 64, "{}", rule);
+        assert!(stdout(&few).starts_with(&format!("error: {} needs {} colours", rule, k)), "{}: {}", rule, stdout(&few));
+    }
+    // outside the class of A_TC3 it fails: a triangle with a pendant vertex, started on a vertex of the triangle that is
+    // not the one the pendant hangs on (three colours cannot explore every subcubic pseudotree: Theorem 13 of the paper)
+    let outside = run(&["exact", "--graph", "4 0 0-1,1-2,0-2,2-3", "--rule", "atc3", "--summary"]);
+    assert_eq!(code(&outside), 1, "{}", stdout(&outside));
+    // the help names them
+    let help = stdout(&run(&["--help"]));
+    for name in ["atc3", "ac4", "aus5", "agen6"] {
+        assert!(help.contains(name), "--help does not mention {}", name);
+    }
+}

@@ -1,0 +1,4 @@
+cmd exact
+k 5
+graph 5 0 0-1,1-2,0-2,2-3,3-4
+default aus5
