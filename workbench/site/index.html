@@ -89,7 +89,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
   </div>
   <div class="group"><label for="k">colours</label><select id="k"><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option></select><span id="khint" class="khint" role="status"></span></div>
   <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I (17)</option><option value="sketch2">Sketch II (14)</option><option value="paw">paw + pendant (k=2 killer)</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path (hand trace 1)</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle (hand trace 2)</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree (hand trace 3)</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="atc3cycle" title="Selects the rule A_TC3 and three colours">A_TC3 · 5-cycle</option><option value="atc3tree" title="Selects the rule A_TC3 and three colours">A_TC3 · binary tree</option><option value="ac4fig2a" title="Selects the rule A_C4 and four colours">A_C4 · bridge + 4-cycle (Fig. 2a)</option><option value="ac4fig2b" title="Selects the rule A_C4 and four colours">A_C4 · K3,2 (Fig. 2b)</option><option value="aus5k4" title="Selects the rule A_US5 and five colours">A_US5 · K4</option><option value="aus5k4tail" title="Selects the rule A_US5 and five colours">A_US5 · K4 with a tail</option><option value="clear">empty canvas</option></select></div>
-  <div class="group"><label for="rn">random graph</label><input type="number" id="rn" value="10" min="2" max="32" step="1" style="width:64px" title="How many vertices: 2 to 32"><button type="button" id="b-random" title="Replace the canvas with a new random connected graph of this many vertices">Generate</button></div>
+  <div class="group"><label for="rn">random graph</label><input type="number" id="rn" value="10" min="2" max="32" step="1" style="width:64px" title="How many vertices: 2 to 32"><select id="rfam" aria-label="family of graph" style="max-width:200px" title="Which family of graph to generate. In brackets: the first algorithm of the papers that is guaranteed to explore it; the algorithms with more colours (A_TC3, A_C4, A_US5, A_Gen6) are guaranteed too."><option value="any" selected>any connected graph (A_Gen6)</option><option value="ktf">clique / triangle-free blocks (A_US5)</option><option value="cb">cycle / K(p,q) blocks (A_C4)</option><option value="cactus">cactus (A_C4)</option><option value="tree">tree (A_TC3)</option><option value="cycle">simple cycle (A_TC3)</option></select><button type="button" id="b-random" title="Replace the canvas with a new random graph of this family and size">Generate</button></div>
   <div class="group"><button type="button" id="b-import-graph">Import / export graph</button></div>
   <div class="group small" id="wasm-status">loading engine…</div>
 </header>
@@ -308,13 +308,80 @@ function colourHint(rule, k) {
   if (k < need.n) return { text: `${text} (now ${k})`, warn: true };
   return { text: need.exact && k > need.n ? `${text} (the other ${k - need.n} unused)` : text, warn: false };
 }
-// A random connected graph with n vertices (2 to 32, the engine's limit), as the text "n 0 u-v,u-v,..." (start vertex 0)
-// and as the list of its edges: a random spanning tree (every vertex after the first joins a random earlier one), then
-// up to n/2 more random edges, so trees, cycles and denser graphs all turn up.  No vertex gets more than 15 neighbours,
-// the engine's limit.  rand() returns a number in [0, 1), as Math.random does.
+// Random graphs, from the families the algorithms of the papers are built for, each inside the next: trees and simple cycles
+// (A_TC3), cacti and graphs whose blocks are cycles or complete bipartite graphs (A_C4), graphs whose blocks are cliques or
+// triangle-free (A_US5), and all connected graphs (A_Gen6).  `from` is the first algorithm guaranteed to explore the family; the
+// ones with more colours are too.  A graph comes back as the text "n 0 u-v,u-v,..." (start vertex 0; 2 to 32 vertices, the
+// engine's limit) and as the list of its edges.  No vertex gets more than 15 neighbours, the engine's limit.
+// rand() returns a number in [0, 1), as Math.random does.
 const RANDOM_GRAPH_MIN = 2, RANDOM_GRAPH_MAX = 32, MAX_DEGREE = 15;
-function randomGraph(n, rand) {
-  if (!Number.isInteger(n) || n < RANDOM_GRAPH_MIN || n > RANDOM_GRAPH_MAX) throw new Error(`A random graph has ${RANDOM_GRAPH_MIN} to ${RANDOM_GRAPH_MAX} vertices.`);
+const RANDOM_FAMILIES = { // kinds: the kinds of block a graph of the family is put together from, with their weights
+  any: { label: 'connected graph', from: 'A_Gen6', min: 2 },
+  ktf: { label: 'graph of clique and triangle-free blocks', from: 'A_US5', min: 2, kinds: { bridge: 2, clique: 3, tfree: 3, cycle: 1 } },
+  cb: { label: 'graph of cycle and K(p,q) blocks', from: 'A_C4', min: 2, kinds: { bridge: 2, cycle: 3, kpq: 3 } },
+  cactus: { label: 'cactus', from: 'A_C4', min: 2, kinds: { bridge: 3, cycle: 5 } },
+  tree: { label: 'tree', from: 'A_TC3', min: 2, kinds: { bridge: 1 } },
+  cycle: { label: 'simple cycle', from: 'A_TC3', min: 3 },
+};
+function graphResult(n, edges) { return { n, edges, text: `${n} 0 ${edges.map(([u, v]) => u + '-' + v).join(',')}` }; }
+function randomGraph(n, rand, family = 'any') {
+  const fam = Object.prototype.hasOwnProperty.call(RANDOM_FAMILIES, family) ? RANDOM_FAMILIES[family] : null;
+  if (!fam) throw new Error(`Unknown family of graphs: ${family}.`);
+  if (!Number.isInteger(n) || n < fam.min || n > RANDOM_GRAPH_MAX) throw new Error(family === 'any' ? `A random graph has ${RANDOM_GRAPH_MIN} to ${RANDOM_GRAPH_MAX} vertices.` : `A random ${fam.label} has ${fam.min} to ${RANDOM_GRAPH_MAX} vertices.`);
+  if (family === 'any') return randomConnectedGraph(n, rand);
+  if (family === 'cycle') return graphResult(n, Array.from({ length: n }, (_, i) => (i + 1 < n ? [i, i + 1] : [0, n - 1])));
+  return randomBlockGraph(n, rand, fam.kinds);
+}
+// The fewest new vertices a block of each kind brings (the vertex it is attached at exists already).
+const BLOCK_MIN_NEW = { bridge: 1, cycle: 2, clique: 2, kpq: 3, tfree: 3 };
+// A block of `kind` that brings at most `room` new vertices, on local vertices 0 (where it is attached) and 1..t: { t, edges }.
+// bridge: one edge.  cycle: 3 to 8 vertices.  clique: K3 to K5.  kpq: the complete bipartite K(p,q), p and q from 2 to 4, vertex 0
+// on the side of p.  tfree: a cycle of 4 to 7 vertices with random chords that make no triangle.
+function randomBlock(kind, room, rand) {
+  const pick = (m) => Math.floor(rand() * m), between = (lo, hi) => lo + pick(hi - lo + 1), edges = [];
+  if (kind === 'bridge') return { t: 1, edges: [[0, 1]] };
+  if (kind === 'cycle' || kind === 'tfree') {
+    const m = kind === 'cycle' ? between(3, Math.min(room + 1, 8)) : between(4, Math.min(room + 1, 7));
+    const adj = Array.from({ length: m }, () => new Set());
+    for (let i = 0; i < m; i++) { const j = (i + 1) % m; edges.push([i, j]); adj[i].add(j); adj[j].add(i); }
+    if (kind === 'tfree') {
+      for (let tries = 0; tries < m; tries++) { // a chord, unless its two ends have a neighbour in common (that would be a triangle)
+        const a = pick(m), b = pick(m);
+        if (a !== b && !adj[a].has(b) && ![...adj[a]].some((x) => adj[b].has(x))) { edges.push([a, b]); adj[a].add(b); adj[b].add(a); }
+      }
+    }
+    return { t: m - 1, edges };
+  }
+  if (kind === 'clique') {
+    const m = between(3, Math.min(room + 1, 5));
+    for (let i = 0; i < m; i++) for (let j = i + 1; j < m; j++) edges.push([i, j]);
+    return { t: m - 1, edges };
+  }
+  const p = between(2, Math.min(4, room - 1)), q = between(2, Math.min(4, room + 1 - p)); // kpq: p + q - 1 <= room
+  for (let i = 0; i < p; i++) for (let j = 0; j < q; j++) edges.push([i, p + j]);
+  return { t: p + q - 1, edges };
+}
+// A graph of exactly n vertices put together block by block: vertex 0 first, then blocks of the given kinds (weights), each
+// attached at a random vertex that has room for it and bringing its other vertices with it, until n are placed.  The blocks of
+// the result are exactly the blocks that were attached.
+function randomBlockGraph(n, rand, kinds) {
+  const pick = (m) => Math.floor(rand() * m), deg = new Array(n).fill(0), edges = [];
+  let count = 1;
+  while (count < n) {
+    const room = n - count, names = Object.keys(kinds).filter((kind) => BLOCK_MIN_NEW[kind] <= room); // bridge always fits
+    let draw = rand() * names.reduce((sum, kind) => sum + kinds[kind], 0), kind = names[names.length - 1];
+    for (const name of names) { if (draw < kinds[name]) { kind = name; break; } draw -= kinds[name]; }
+    let block = randomBlock(kind, room, rand);
+    const open = (extra) => { const list = []; for (let u = 0; u < count; u++) if (deg[u] + extra <= MAX_DEGREE) list.push(u); return list; };
+    let spots = open(block.edges.filter(([a, b]) => a === 0 || b === 0).length);
+    if (spots.length === 0) { block = { t: 1, edges: [[0, 1]] }; spots = open(1); } // no vertex has room for the block: a pendant vertex
+    const at = spots[pick(spots.length)], id = (local) => (local === 0 ? at : count + local - 1);
+    for (const [a, b] of block.edges) { const u = id(a), v = id(b); deg[u]++; deg[v]++; edges.push([Math.min(u, v), Math.max(u, v)]); }
+    count += block.t;
+  }
+  return graphResult(n, edges);
+}
+function randomConnectedGraph(n, rand) {
   const pick = (m) => Math.floor(rand() * m), deg = new Array(n).fill(0), seen = new Set(), edges = [];
   const key = (u, v) => Math.min(u, v) * n + Math.max(u, v);
   const add = (u, v) => { seen.add(key(u, v)); deg[u]++; deg[v]++; edges.push([Math.min(u, v), Math.max(u, v)]); };
@@ -326,7 +393,7 @@ function randomGraph(n, rand) {
     const u = pick(n), v = pick(n);
     if (u !== v && deg[u] < MAX_DEGREE && deg[v] < MAX_DEGREE && !seen.has(key(u, v))) add(u, v);
   }
-  return { n, edges, text: `${n} 0 ${edges.map(([u, v]) => u + '-' + v).join(',')}` };
+  return graphResult(n, edges);
 }
 // Where to draw the vertices so the graph can be read: 300 rounds of the Fruchterman-Reingold spring layout (every pair
 // of vertices pushes apart, every edge pulls together, the moves cool down) in a w by h box, starting from a circle
@@ -497,10 +564,10 @@ function canvasCover() {
   } catch (e) { /* nothing to measure: the margins alone */ }
   return out;
 }
-// The "random graph" option: replaces the canvas with a new random connected graph of the chosen size.  The rule,
+// The "random graph" option: replaces the canvas with a new random graph of the chosen family and size.  The rule,
 // the colours and the rows in use are left as they are.
 function makeRandomGraph() {
-  let g; try { g = randomGraph(Number($('#rn').value), Math.random); } catch (err) { alert(err.message); return; }
+  let g; try { g = randomGraph(Number($('#rn').value), Math.random, $('#rfam').value || 'any'); } catch (err) { alert(err.message); return; }
   // Load the graph first: that draws the new play state, which can change the size of the canvas box (it does in the
   // stacked layout of a narrow window), and the legend and the hint are fixed to the corners of that box.  Only then
   // are they measured, and the vertices placed where neither covers them.

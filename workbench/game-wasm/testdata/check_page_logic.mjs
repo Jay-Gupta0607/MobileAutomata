@@ -24,7 +24,7 @@ for (const [name, text] of [['site/index.html', html], ['docs/index.html', readF
 }
 const a = html.indexOf('// <page-logic>'), b = html.indexOf('// </page-logic>');
 if (a < 0 || b < a) throw new Error('the page-logic block was not found in site/index.html');
-const { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, randomGraph, springLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, randomGraph, springLayout, layoutArea };')();
+const { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, RANDOM_FAMILIES, randomGraph, springLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, RANDOM_FAMILIES, randomGraph, springLayout, layoutArea };')();
 
 let bad = 0;
 const check = (ok, what) => { if (!ok) { bad++; console.log('FAIL  ' + what); } };
@@ -139,6 +139,93 @@ for (const h of [250, 435]) for (const n of [2, 9, 16, 24, 32]) for (let seed = 
   let closest = Infinity; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) closest = Math.min(closest, Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1]));
   check(closest >= 40, `${what}: no two vertices on top of each other (closest ${closest.toFixed(1)})`);
 }
+
+// 2c-ii. the families of random graphs: every graph has exactly n vertices, is connected, repeats no edge, has at most 15 neighbours at
+// a vertex and is in its family, as a block decomposition written here, apart from the generator, says; the families nest
+const blocksOf = (n, edges) => { // Tarjan: the blocks of a connected graph, as lists of edges
+  const adj = Array.from({ length: n }, () => []), disc = new Array(n).fill(0), low = new Array(n).fill(0), stack = [], out = [];
+  for (const [u, v] of edges) { adj[u].push(v); adj[v].push(u); }
+  let time = 0;
+  const dfs = (u, parent) => {
+    disc[u] = low[u] = ++time;
+    for (const v of adj[u]) {
+      if (disc[v] === 0) {
+        stack.push([u, v]); dfs(v, u); low[u] = Math.min(low[u], low[v]);
+        if (low[v] >= disc[u]) { const block = []; for (;;) { const e = stack.pop(); block.push(e); if (e[0] === u && e[1] === v) break; } out.push(block); }
+      } else if (v !== parent && disc[v] < disc[u]) { stack.push([u, v]); low[u] = Math.min(low[u], disc[v]); }
+    }
+  };
+  dfs(0, -1);
+  return out;
+};
+const vertsOf = (block) => [...new Set(block.flat())];
+const hasEdgeIn = (block, a, b) => block.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+const isBridgeBlock = (block) => block.length === 1;
+const isCliqueBlock = (block) => { const v = vertsOf(block).length; return block.length === v * (v - 1) / 2; };
+const isTriangleFreeBlock = (block) => { const v = vertsOf(block); for (const a of v) for (const b of v) for (const c of v) if (a < b && b < c && hasEdgeIn(block, a, b) && hasEdgeIn(block, b, c) && hasEdgeIn(block, a, c)) return false; return true; };
+const isCycleBlock = (block) => { const v = vertsOf(block); return v.length >= 3 && block.length === v.length && v.every((x) => block.filter(([a, b]) => a === x || b === x).length === 2); };
+const isCompleteBipartiteBlock = (block) => { // two-colour the block, then every pair across the sides must be an edge
+  const v = vertsOf(block), side = new Map([[v[0], 0]]), todo = [v[0]];
+  while (todo.length) {
+    const x = todo.pop();
+    for (const [a, b] of block) {
+      const y = a === x ? b : b === x ? a : -1;
+      if (y < 0) continue;
+      if (!side.has(y)) { side.set(y, 1 - side.get(x)); todo.push(y); } else if (side.get(y) === side.get(x)) return false;
+    }
+  }
+  const p = [...side.values()].filter((s) => s === 0).length;
+  return block.length === p * (v.length - p);
+};
+const inFamily = {
+  any: () => true,
+  tree: (n, e) => e.length === n - 1,
+  cycle: (n, e) => e.length === n && n >= 3 && degrees(n, e).every((d) => d === 2),
+  cactus: (n, e) => blocksOf(n, e).every((b) => isBridgeBlock(b) || isCycleBlock(b)),
+  cb: (n, e) => blocksOf(n, e).every((b) => isBridgeBlock(b) || isCycleBlock(b) || isCompleteBipartiteBlock(b)),
+  ktf: (n, e) => blocksOf(n, e).every((b) => isCliqueBlock(b) || isTriangleFreeBlock(b)),
+};
+const wider = { tree: ['cactus', 'cb', 'ktf', 'any'], cycle: ['cactus', 'cb', 'ktf', 'any'], cactus: ['cb', 'ktf', 'any'], cb: ['ktf', 'any'], ktf: ['any'], any: [] };
+same(Object.keys(RANDOM_FAMILIES).sort(), Object.keys(inFamily).sort(), 'the families the generator offers are the ones tested here');
+let familyGraphs = 0;
+for (const family of Object.keys(RANDOM_FAMILIES)) {
+  for (let n = RANDOM_FAMILIES[family].min; n <= 32; n++) for (let seed = 1; seed <= 12; seed++) {
+    const g = randomGraph(n, seeded(n * 131 + seed * 7 + family.length * 7919), family), what = `${family} n=${n} seed=${seed}`;
+    const [tn, ts, list] = g.text.split(' '), parsed = list ? list.split(',').map((e) => e.split('-').map(Number)) : [];
+    check(+tn === n && ts === '0', `${what}: the text has n vertices and start 0`);
+    check(parsed.length === g.edges.length && parsed.every(([u, v], i) => u === g.edges[i][0] && v === g.edges[i][1]), `${what}: the text is the edge list`);
+    check(new Set(parsed.map((e) => e.join('-'))).size === parsed.length && parsed.every(([u, v]) => u >= 0 && u < v && v < n), `${what}: edges distinct, smaller end first, inside the graph`);
+    check(reaches(n, parsed), `${what}: connected (the engine refuses a graph that is not)`);
+    check(Math.max(...degrees(n, parsed)) <= 15, `${what}: at most 15 neighbours at a vertex`);
+    check(inFamily[family](n, parsed), `${what}: in its family`);
+    for (const w of wider[family]) check(inFamily[w](n, parsed), `${what}: and so in the wider family ${w}`);
+    familyGraphs++;
+  }
+}
+check(familyGraphs > 1000, `${familyGraphs} family graphs checked`);
+// what turns up across many big graphs: each family uses its kinds of block, and the families really differ
+const variety = (family, pred, runs = 60) => { let hits = 0; for (let seed = 1; seed <= runs; seed++) { const g = randomGraph(32, seeded(seed * 17 + 3), family); if (pred(blocksOf(32, g.edges), g.edges)) hits++; } return hits; };
+check(variety('ktf', (bs) => bs.some((b) => isCliqueBlock(b) && vertsOf(b).length >= 4)) > 0, 'clique / triangle-free blocks: some graph has a clique of four or more vertices');
+check(variety('ktf', (bs) => bs.some((b) => isCliqueBlock(b) && vertsOf(b).length === 3)) > 0, 'clique / triangle-free blocks: some graph has a triangle');
+check(variety('ktf', (bs) => bs.some((b) => vertsOf(b).length >= 4 && isTriangleFreeBlock(b) && !isCycleBlock(b) && !isCompleteBipartiteBlock(b))) > 0, 'clique / triangle-free blocks: some triangle-free block is neither a cycle nor complete bipartite');
+check(variety('cb', (bs) => bs.some((b) => isCompleteBipartiteBlock(b) && !isCycleBlock(b) && !isBridgeBlock(b))) > 0, 'cycle / K(p,q) blocks: some K(p,q) with a side of three or more');
+check(variety('cb', (bs) => bs.some(isCycleBlock) && bs.some(isBridgeBlock)) > 0, 'cycle / K(p,q) blocks: cycles and bridges turn up');
+check(variety('cactus', (bs) => bs.some(isCycleBlock) && bs.some(isBridgeBlock)) > 0, 'cactus: cycles and bridges turn up');
+check(variety('tree', (bs) => bs.every(isBridgeBlock)) === 60, 'tree: every block is a bridge');
+check(variety('ktf', (bs, e) => !inFamily.cb(32, e)) > 0, 'the clique / triangle-free family is bigger than the cycle / K(p,q) family');
+check(variety('cb', (bs, e) => !inFamily.cactus(32, e)) > 0, 'the cycle / K(p,q) family is bigger than the cacti');
+check(variety('cactus', (bs, e) => !inFamily.tree(32, e)) > 0, 'the cacti are more than trees');
+check(variety('any', (bs, e) => !inFamily.ktf(32, e)) >= 15, 'a good share (a quarter or more) of the big random graphs of no family are outside clique / triangle-free blocks, which is why that choice exists');
+// refusals, and the menu of the page
+const refusal = (fn) => { try { fn(); return null; } catch (e) { return e.message; } };
+same(refusal(() => randomGraph(2, Math.random, 'cycle')), 'A random simple cycle has 3 to 32 vertices.', 'a cycle needs three vertices');
+same(refusal(() => randomGraph(33, Math.random, 'tree')), 'A random tree has 2 to 32 vertices.', 'a size above 32 is refused for a family');
+same(refusal(() => randomGraph(33, Math.random)), 'A random graph has 2 to 32 vertices.', 'the default family keeps its message');
+same([refusal(() => randomGraph(5, Math.random, 'nope')), refusal(() => randomGraph(5, Math.random, 'constructor'))], ['Unknown family of graphs: nope.', 'Unknown family of graphs: constructor.'], 'a name that is not a family is refused, not looked up as one');
+same(refusal(() => randomGraph(2, seeded(1), 'tree')), null, 'two vertices make a tree');
+const menu = html.match(/<select id="rfam"[^>]*>([\s\S]*?)<\/select>/)[1];
+same([...menu.matchAll(/<option value="(\w+)"/g)].map((m) => m[1]).sort(), Object.keys(RANDOM_FAMILIES).sort(), 'the menu offers exactly the families the generator has');
+for (const [key, f] of Object.entries(RANDOM_FAMILIES)) check(new RegExp(`<option value="${key}"[^>]*>[^<]*\\(${f.from}\\)</option>`).test(menu), `${key}: the menu names the first algorithm guaranteed, ${f.from}`);
 
 // 2d. where a random graph may go: clear of the legend (top right) and the hint (bottom left), which are drawn over the canvas
 const legend = { left: 700, right: 990, top: 10, bottom: 61 }, hint = { left: 12, right: 370, top: 580, bottom: 630 };

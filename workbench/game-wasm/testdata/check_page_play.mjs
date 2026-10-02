@@ -323,5 +323,36 @@ P.togglePlay(); fakeNow += 260 * 2; clock.onmessage({ data: 0 });
 same([P.state.playing, P.state.play.steps.length, workers.filter((w) => w === clock).length], [true, 6, 1], 'Play again carries on, with the same worker');
 P.togglePlay();
 
+// 13. the family choice, as the button drives it, against the real engine: every algorithm that is guaranteed for a family explores the
+//     graphs of that family, whatever their size; and the algorithms with fewer colours do fail outside their families, so the choice
+//     matters.  Math.random of the page is seeded here, so the graphs (and any failure) can be reproduced.
+vm.runInContext('(() => { let s = 20261002; Math.random = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })()', sandbox);
+const colourCount = { atc3: 3, ac4: 4, aus5: 5, agen6: 6 };
+const useRule = (key) => Object.assign(P.state, { k: colourCount[key], def: key, table: new Map(), algoSrc: '', algo: null, algoError: null });
+const generate = (family, n) => { element('#rfam').value = family; element('#rn').value = String(n); alerts.length = 0; P.makeRandomGraph(); return alerts.length === 0; };
+const guaranteed = { any: ['agen6'], ktf: ['aus5', 'agen6'], cb: ['ac4', 'aus5', 'agen6'], cactus: ['ac4', 'aus5', 'agen6'], tree: ['atc3', 'ac4', 'aus5', 'agen6'], cycle: ['atc3', 'ac4', 'aus5', 'agen6'] };
+let familyRuns = 0;
+for (const [family, algos] of Object.entries(guaranteed)) {
+  for (const n of [3, 4, 5, 6, 12, 20, 32]) for (let rep = 0; rep < 2; rep++) {
+    check(generate(family, n), `${family} n=${n}: generated without a complaint`);
+    same(P.state.nodes.length, n, `${family} n=${n}: the canvas has ${n} vertices`);
+    for (const key of algos) {
+      useRule(key);
+      const small = n <= 6, ans = P.engine(P.requestText(small ? 'exact' : 'walks', small ? { cap: 5000000 } : { walks: 24 }));
+      same(ans.status, small ? 'explores' : 'unrefuted', `${family} n=${n} with ${key}: ${P.state.edges.map(([u, v]) => u + '-' + v).join(',')}`);
+      familyRuns++;
+    }
+  }
+}
+check(familyRuns >= 180, `${familyRuns} runs of an algorithm on a graph of a family it is guaranteed for`);
+// outside its family an algorithm may fail (the walks only ever find real failures)
+const failures = (family, key, n, runs) => {
+  let found = 0;
+  for (let i = 0; i < runs; i++) { generate(family, n); useRule(key); if (P.engine(P.requestText('walks', { walks: 24 })).status === 'fails') found++; }
+  return found;
+};
+const outside = [['any', 'aus5', 'A_US5 on graphs of no family (its guarantee is for clique / triangle-free blocks)'], ['ktf', 'ac4', 'A_C4 on graphs with clique blocks (its guarantee is for cycle / K(p,q) blocks)'], ['cb', 'atc3', 'A_TC3 on graphs with K(p,q) blocks (its guarantee is for trees and cycles)'], ['cactus', 'atc3', 'A_TC3 on cacti (its guarantee is for trees and cycles)']];
+for (const [family, key, what] of outside) check(failures(family, key, 20, 30) > 0, `${what} fails on some graph`);
+
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

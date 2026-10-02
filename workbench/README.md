@@ -26,15 +26,29 @@ or newer.
   (click; or double-click a vertex).  Keyboard `N E M D S`.  Up to 32
   vertices, degree at most 15.  Import/export as `n start u-v,u-v,...`, the
   `cegis` instance format; presets include the two hand-drawn sketches.
-* **Random graph.** The *random graph* box in the header takes a number of vertices (2 to 32) and *Generate*
-  (or Enter) replaces the canvas with a new random connected graph of that size: a random spanning tree plus up to
-  n/2 extra edges, so trees, cycles and denser graphs all turn up, never more than 15 neighbours at a vertex (the
-  engine's limit), start vertex 0, laid out by a spring layout so it can be read, inside the part of the canvas that the
-  legend (top right) and the hint bar (bottom left) do not cover; they are measured after the new graph is drawn, since
-  that can change the size of the canvas box.  The rule, the colours and the rows in
-  use are left alone.  A size outside 2 to 32 is refused with a message and the canvas stays as it was.  Replacing the
-  whole graph (this option, a preset, Import) also clears the Analysis tab and cancels a search still running, since
-  a result belongs to the graph it was computed for.
+* **Random graph.** The *random graph* box in the header takes a number of vertices (2 to 32) and a *family*, and *Generate*
+  (or Enter) replaces the canvas with a new random connected graph of that size and family.  The families are the
+  classes the algorithms of the papers are built for, each inside the next, so each algorithm is guaranteed on its
+  family and on every family above it (the menu names the first one):
+
+  | family | blocks of the graph | guaranteed for |
+  |---|---|---|
+  | simple cycle | one cycle (3 to 32 vertices) | A_TC3, A_C4, A_US5, A_Gen6 |
+  | tree | bridges only | A_TC3, A_C4, A_US5, A_Gen6 |
+  | cactus | bridges and cycles | A_C4, A_US5, A_Gen6 |
+  | cycle / K(p,q) blocks | bridges, cycles and complete bipartite K(p,q), p and q from 2 to 4 | A_C4, A_US5, A_Gen6 |
+  | clique / triangle-free blocks | bridges, cliques K3 to K5, cycles and triangle-free blocks with chords | A_US5, A_Gen6 |
+  | any connected graph | a random spanning tree plus up to n/2 extra edges | A_Gen6 |
+
+  The first five are built block by block: vertex 0, then blocks attached at random vertices until exactly n vertices are
+  placed.  No vertex gets more than 15 neighbours (the engine's limit); the start vertex is 0; the graph is laid out by a
+  spring layout so it can be read, inside the part of the canvas that the legend (top right) and the hint bar (bottom
+  left) do not cover (they are measured after the new graph is drawn, since that can change the size of the canvas box).
+  "Any connected graph" is what the box gave before the families existed; it falls outside the A_US5 family often (about
+  one graph in five at 10 vertices, about half at 32), which is when A_US5 can fail on it.  The rule, the colours and the
+  rows in use are left alone.  A size outside the family's range (a cycle needs 3) is refused with a message and the
+  canvas stays as it was.  Replacing the whole graph (this option, a preset, Import) also clears the Analysis tab and
+  cancels a search still running, since a result belongs to the graph it was computed for.
 * **Play.** *Play* steps at the speed of the slider.  Its clock is a timer inside a Web Worker rather than a timer of the
   page, and each tick does the steps that are due by the clock, so a play keeps its speed while you are in another tab
   (a browser slows the timers of a page nobody is looking at; a tick that comes late catches up instead).  A hidden
@@ -102,10 +116,12 @@ the engine's reason and indicators); `check_page_play.mjs` runs the page's real 
 engine and drives the Play tab (when a play ends, the banners and indicators, rule numbers, colour names, undo after a
 stop, replay) and the random graph button (every size from 2 to 32 gives a graph the engine accepts, on which A_Gen6
 survives the walks), checks the play clock (a late tick catches up, a hidden tab draws nothing, pause stops the clock),
-and plays each of the three algorithms of the second paper twice, once chosen as the rule and once as
+generates graphs of every family at several sizes and runs every algorithm guaranteed for the family on them (they must
+explore, and the algorithms with fewer colours must fail somewhere outside their family), and plays each of the three
+algorithms of the second paper twice, once chosen as the rule and once as
 the code of its template, which must give the same play step for step; `check_page_logic.mjs` also checks the generator
-(connected, no repeated edge, at most 15 neighbours, different graphs each time, the extremes of the randomness) and
-that the layout puts no two vertices on top of each other, and that each template's colour constants and rule numbers
+(connected, no repeated edge, at most 15 neighbours, different graphs each time, the extremes of the randomness), that
+every graph of each family is in its family (by a separate block decomposition) and the families nest, and that the layout puts no two vertices on top of each other, and that each template's colour constants and rule numbers
 agree with the page's colour names and rule descriptions; `check_wasm_parity.mjs` also requires every preset that
 brings one of the algorithms of the papers to explore.
 
