@@ -384,6 +384,12 @@ function layoutArea(cover) {
   if (bottom - top < 250) { top = 40; bottom = H - 40; }
   return { x: X0, y: top, w: X1 - X0, h: bottom - top };
 }
+// How many steps a play tick owes: one for every `interval` ms since the play's clock, at least one and at most `cap`.  A tick
+// that comes late (a browser slows a tab nobody is looking at) then catches up instead of letting the play crawl.
+function stepsDue(elapsed, interval, cap) {
+  const n = Math.floor(elapsed / interval);
+  return Number.isFinite(n) ? Math.min(cap, Math.max(1, n)) : 1;
+}
 // </page-logic>
 
 // ------------------------------------------------------------ engine (wasm)
@@ -438,7 +444,7 @@ const state = {
   def: 'none', sweep: [0, 4, 0],
   algo: null, // {src, table: Map, maxDeg, errors}
   algoSrc: '',
-  play: null, replay: null, timer: null, defining: null,
+  play: null, replay: null, playing: false, tickAt: 0, stale: false, defining: null,
 };
 const PRESETS = {
   sketch1: { text: '17 0 0-1,1-2,0-2,0-3,2-3,0-4,4-5,3-6,4-6,5-6,5-7,6-8,7-8,5-9,9-14,9-15,9-10,10-16,5-10,9-11,10-11,5-11,7-11,11-12,11-13,12-13', k: 5,
@@ -852,13 +858,41 @@ function stepOnce(auto) {
   if (auto) { applyChoice(p.pending.auto); return; }
   stopPlay(); flash('Your move as the adversary: click one of the highlighted vertices, or Auto step.');
 }
-function stopPlay() { if (state.timer) { clearInterval(state.timer); state.timer = null; } const b = $('#b-play'); if (b) b.textContent = '▶ Play'; }
+// The play loop.  Its clock is a timer inside a Web Worker, not setInterval on the page: a browser slows the page's own timers
+// when the tab is not shown (to once a second, later once a minute) but not a worker's, so a play goes on at its speed while you
+// are in another tab.  Each tick also does the steps that are due by the clock (stepsDue), so a tick that does come late
+// catches up, and a hidden tab draws nothing until it is shown again.
+const MAX_STEPS_PER_TICK = 2000;
+let ticker = null;
+function tickerSend(ms) { // ms > 0: tick every ms milliseconds; 0: stop
+  if (!ticker && ms > 0) {
+    try {
+      ticker = new Worker(URL.createObjectURL(new Blob(['let id = null; onmessage = (e) => { if (id !== null) clearInterval(id); id = e.data > 0 ? setInterval(() => postMessage(0), e.data) : null; };'], { type: 'text/javascript' })));
+      ticker.onmessage = playTick;
+    } catch (err) { // no workers here: the page's own timer, which a background tab slows
+      ticker = { id: null, postMessage(every) { clearInterval(this.id); this.id = every > 0 ? setInterval(playTick, every) : null; } };
+    }
+  }
+  if (ticker) ticker.postMessage(ms);
+}
+function playMs() { return 1300 / +$('#speed').value; }
+function stopPlay() { if (state.playing) { state.playing = false; tickerSend(0); } const b = $('#b-play'); if (b) b.textContent = '▶ Play'; }
+function playTick() {
+  if (!state.playing) return;
+  const p = state.play, now = performance.now(), ms = playMs(), due = stepsDue(now - state.tickAt, ms, MAX_STEPS_PER_TICK);
+  state.tickAt = Math.min(now, state.tickAt + due * ms); // the remainder of a step carries over to the next tick
+  for (let i = 0; i < due && state.playing && p.pending && !p.done; i++) stepOnce(true);
+  if (!p.pending) stopPlay();
+  if (document.hidden) state.stale = true; else render();
+}
 function togglePlay() {
-  if (state.timer) { stopPlay(); return; }
+  if (state.playing) { stopPlay(); return; }
   if (!state.play || state.play.done) return;
   $('#b-play').textContent = '❚❚ Pause';
-  state.timer = setInterval(() => { stepOnce(true); render(); if (!state.play.pending) stopPlay(); }, 1300 / +$('#speed').value);
+  state.playing = true; state.tickAt = performance.now(); state.stale = false;
+  tickerSend(playMs());
 }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && state.stale) { state.stale = false; render(); } });
 function loadReplay(trace) { resetPlay(); state.replay = { steps: trace.steps, index: 0, repeatAt: trace.repeat_at, unvisited: trace.unvisited, diverged: false }; switchTab('play'); render(); }
 
 // ------------------------------------------------------------ rendering
@@ -1131,7 +1165,7 @@ $('#b-reset').addEventListener('click', () => { resetPlay(); render(); });
 $('#b-step').addEventListener('click', () => { stopPlay(); stepOnce(false); render(); });
 $('#b-auto').addEventListener('click', () => { stopPlay(); stepOnce(true); render(); });
 $('#b-play').addEventListener('click', () => { togglePlay(); });
-$('#speed').addEventListener('input', () => { if (state.timer) { stopPlay(); togglePlay(); } });
+$('#speed').addEventListener('input', () => { if (state.playing) tickerSend(playMs()); });
 $('#b-exact').addEventListener('click', () => analyse('exact'));
 $('#b-walks').addEventListener('click', () => analyse('walks'));
 $('#b-cancel').addEventListener('click', () => cancelAnalysis('<div class="banner neutral">Cancelled.</div>'));

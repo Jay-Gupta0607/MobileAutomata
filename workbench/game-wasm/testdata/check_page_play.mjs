@@ -18,7 +18,7 @@ let src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const head = '(async function () {', tail = /resetPlay\(\); render\(\);\n\}\)\(\);\s*$/;
 if (!src.includes(head) || !tail.test(src)) throw new Error('the page script no longer has the shape this test expects');
 src = src.replace(head, 'globalThis.__ready = ' + head).replace(tail, `resetPlay(); render();
-globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph, analyse };
+globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph, analyse, togglePlay };
 })();`);
 
 // a stand-in for an element: remembers what is set on it, answers every method with itself (and notes which were called)
@@ -45,12 +45,15 @@ function element(sel) {
   elements.set(sel, el);
   return el;
 }
-const document = { querySelector: (s) => element(s), querySelectorAll: () => [], activeElement: null, addEventListener() {} };
+const docListeners = {}; // what the page registers on the document, by event
+const document = { hidden: false, querySelector: (s) => element(s), querySelectorAll: () => [], activeElement: null, addEventListener(type, fn) { (docListeners[type] = docListeners[type] || []).push(fn); } };
+let fakeNow = 0; // performance.now() for the page, moved by the test
 // a worker that starts (answers 'init') but never finishes a search, so a search can be "running" while the test acts
 let workersStarted = 0;
-class Worker { constructor() { workersStarted++; } postMessage(m) { if (m.type === 'init') queueMicrotask(() => this.onmessage({ data: { type: 'ready' } })); } terminate() {} }
+const workers = []; // every worker the page starts; one that is told a number is the play clock, and remembers its interval
+class Worker { constructor() { workersStarted++; workers.push(this); } postMessage(m) { if (m && m.type === 'init') queueMicrotask(() => this.onmessage({ data: { type: 'ready' } })); else if (typeof m === 'number') this.tickMs = m; } terminate() {} }
 const sandbox = {
-  document, Worker, console, setInterval, clearInterval, setTimeout, clearTimeout, Blob, URL, TextEncoder, TextDecoder,
+  document, Worker, performance: { now: () => fakeNow }, console, setInterval, clearInterval, setTimeout, clearTimeout, Blob, URL, TextEncoder, TextDecoder,
   localStorage: { getItem: () => null, setItem() {} },
   fetch: async () => { const b = readFileSync(join(site, 'game.wasm')); return { ok: true, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) }; },
   alert: (m) => alerts.push(String(m)), confirm: () => true,
@@ -282,6 +285,43 @@ check(String(P.engine(P.requestText('step', { colours: '0 0 0', cur: 0, vis: '0'
 // a table row still wins over the algorithm, and then carries no rule number
 setup({ k: 3, def: 'atc3', graph: '3 0 0-1,1-2', table: [['0.100', { paint: 1, target: 0 }]] });
 check(P.state.play.pending.source === 'table' && !P.state.play.pending.rule, 'a row of the table wins over A_TC3 and has no rule number');
+
+// 12. the play loop runs on the clock of a worker and does the steps that are due, so it keeps its speed in a tab nobody is
+//     looking at: a late tick (a browser may slow a hidden tab) catches up, and a hidden tab draws nothing until it is shown
+setup({ k: 6, def: 'agen6', graph: '4 0 0-1,0-2,1-3' });
+element('#speed').value = '5'; // 1300 / 5 = 260 ms a step
+fakeNow = 1000; const workersBefore = workers.length;
+P.togglePlay();
+const clock = workers[workers.length - 1];
+same([P.state.playing, workers.length - workersBefore, clock.tickMs, String(element('#b-play').textContent)], [true, 1, 260, '❚❚ Pause'], 'Play starts the clock of a worker at the speed of the slider');
+fakeNow += 260; clock.onmessage({ data: 0 });
+same(P.state.play.steps.length, 1, 'a tick on time does one step');
+fakeNow += 260 * 10.5; clock.onmessage({ data: 0 });
+same(P.state.play.steps.length, 11, 'a tick that comes 10.5 steps late does the 10 steps that are due');
+fakeNow += 260 * 0.5; clock.onmessage({ data: 0 });
+same(P.state.play.steps.length, 12, 'and the half step that was left over counts towards the next');
+// hidden: the steps are done, nothing is drawn
+element('#playstatus').innerHTML = ''; document.hidden = true;
+fakeNow += 260 * 3; clock.onmessage({ data: 0 });
+same([P.state.play.steps.length, String(element('#playstatus').innerHTML), P.state.stale], [15, '', true], 'in a hidden tab the steps are done but nothing is drawn');
+document.hidden = false; docListeners.visibilitychange.forEach((fn) => fn());
+check(String(element('#playstatus').innerHTML).includes('Step 15') && P.state.stale === false, 'shown again, the tab draws where the play has got to');
+// the play ends by itself at the stop, whatever the lateness, and the clock is stopped
+fakeNow += 260 * 100000; clock.onmessage({ data: 0 });
+same([P.state.playing, P.state.play.done && P.state.play.done.kind, P.state.play.steps.length, clock.tickMs, String(element('#b-play').textContent)], [false, 'stopped', 24, 0, '▶ Play'], 'the play ends at the stop, A_Gen6 having stopped on the start after 24 steps, and the clock stops');
+// a tick that arrives after the play was stopped does nothing
+const n24 = P.state.play.steps.length; fakeNow += 5000; clock.onmessage({ data: 0 });
+same(P.state.play.steps.length, n24, 'a stray tick after the end does nothing');
+// pausing stops the clock, and Play again carries on from where it was
+setup({ k: 6, def: 'agen6', graph: '4 0 0-1,0-2,1-3' });
+fakeNow = 0; P.togglePlay(); fakeNow += 260 * 4; clock.onmessage({ data: 0 });
+P.togglePlay();
+same([P.state.playing, clock.tickMs, P.state.play.steps.length], [false, 0, 4], 'Pause stops the clock');
+fakeNow += 1e6; clock.onmessage({ data: 0 });
+same(P.state.play.steps.length, 4, 'a paused play does not move');
+P.togglePlay(); fakeNow += 260 * 2; clock.onmessage({ data: 0 });
+same([P.state.playing, P.state.play.steps.length, workers.filter((w) => w === clock).length], [true, 6, 1], 'Play again carries on, with the same worker');
+P.togglePlay();
 
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

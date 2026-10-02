@@ -35,6 +35,10 @@ or newer.
   use are left alone.  A size outside 2 to 32 is refused with a message and the canvas stays as it was.  Replacing the
   whole graph (this option, a preset, Import) also clears the Analysis tab and cancels a search still running, since
   a result belongs to the graph it was computed for.
+* **Play.** *Play* steps at the speed of the slider.  Its clock is a timer inside a Web Worker rather than a timer of the
+  page, and each tick does the steps that are due by the clock, so a play keeps its speed while you are in another tab
+  (a browser slows the timers of a page nobody is looking at; a tick that comes late catches up instead).  A hidden
+  tab does the steps but draws nothing until it is shown again.
 * **Rules.** A table of `own.bag -> paint>target` rows (the `rule_final.txt`
   format, importable), plus a default for rows the table does not list:
   nothing (the play stops at the first undefined row and asks for its action,
@@ -97,7 +101,8 @@ both pages and holds the paper-model logic to the engine (for every paper-model 
 the engine's reason and indicators); `check_page_play.mjs` runs the page's real script headlessly against the real
 engine and drives the Play tab (when a play ends, the banners and indicators, rule numbers, colour names, undo after a
 stop, replay) and the random graph button (every size from 2 to 32 gives a graph the engine accepts, on which A_Gen6
-survives the walks), and plays each of the three algorithms of the second paper twice, once chosen as the rule and once as
+survives the walks), checks the play clock (a late tick catches up, a hidden tab draws nothing, pause stops the clock),
+and plays each of the three algorithms of the second paper twice, once chosen as the rule and once as
 the code of its template, which must give the same play step for step; `check_page_logic.mjs` also checks the generator
 (connected, no repeated edge, at most 15 neighbours, different graphs each time, the extremes of the randomness) and
 that the layout puts no two vertices on top of each other, and that each template's colour constants and rule numbers

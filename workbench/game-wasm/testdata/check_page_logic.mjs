@@ -24,7 +24,7 @@ for (const [name, text] of [['site/index.html', html], ['docs/index.html', readF
 }
 const a = html.indexOf('// <page-logic>'), b = html.indexOf('// </page-logic>');
 if (a < 0 || b < a) throw new Error('the page-logic block was not found in site/index.html');
-const { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, randomGraph, springLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, randomGraph, springLayout, layoutArea };')();
+const { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, randomGraph, springLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, randomGraph, springLayout, layoutArea };')();
 
 let bad = 0;
 const check = (ok, what) => { if (!ok) { bad++; console.log('FAIL  ' + what); } };
@@ -75,6 +75,10 @@ same([ruleText('atc3', 9).length > 10, ruleText('atc3', 12), ruleText('aus5', 19
 same([algoOfCode('// A_Gen6 (x)\nreturn null;'), algoOfCode('  // A_TC3 (y)'), algoOfCode('// A_C4 (z)'), algoOfCode('// A_US5 (w)'), algoOfCode('// my own rule'), algoOfCode(''), algoOfCode('// A_Gen7'), algoOfCode('return null; // A_TC3')], ['agen6', 'atc3', 'ac4', 'aus5', null, null, null, null], 'code is an algorithm only by its first comment line');
 
 same(['init', 'unused', 'Init', 'white', 'l0', 'head1', 'neigh', 'fin', 'front', 'path', 'colour 3'].map(article), ['an', 'an', 'an', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'], 'a or an before a colour name');
+
+// 2a. the steps a play tick owes (a late tick catches up; never fewer than one, never more than the cap)
+same([stepsDue(0, 130, 2000), stepsDue(50, 130, 2000), stepsDue(130, 130, 2000), stepsDue(260, 130, 2000), stepsDue(1000, 130, 2000), stepsDue(60000, 130, 2000), stepsDue(1e9, 130, 2000)], [1, 1, 1, 2, 7, 461, 2000], 'steps due by the clock');
+same([stepsDue(-5, 130, 2000), stepsDue(NaN, 130, 2000), stepsDue(Infinity, 130, 2000), stepsDue(500, 0, 2000), stepsDue(500, NaN, 2000)], [1, 1, 1, 1, 1], 'a clock that makes no sense still gives one step');
 
 // 2b. the hint next to the colours picker
 same(colourHint('agen6', 6), { text: 'A_Gen6 needs 6 colours', warn: false }, 'A_Gen6 with six colours');
