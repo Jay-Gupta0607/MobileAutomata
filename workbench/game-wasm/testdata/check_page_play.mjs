@@ -354,5 +354,17 @@ const failures = (family, key, n, runs) => {
 const outside = [['any', 'aus5', 'A_US5 on graphs of no family (its guarantee is for clique / triangle-free blocks)'], ['ktf', 'ac4', 'A_C4 on graphs with clique blocks (its guarantee is for cycle / K(p,q) blocks)'], ['cb', 'atc3', 'A_TC3 on graphs with K(p,q) blocks (its guarantee is for trees and cycles)'], ['cactus', 'atc3', 'A_TC3 on cacti (its guarantee is for trees and cycles)']];
 for (const [family, key, what] of outside) check(failures(family, key, 20, 30) > 0, `${what} fails on some graph`);
 
+// 14. the random tree, as the button draws it: the start vertex is the root at the top and every vertex is below its parent
+for (const n of [3, 5, 8, 10, 14]) for (let rep = 0; rep < 3; rep++) {
+  check(generate('tree', n), `tree n=${n}: generated without a complaint`);
+  const { nodes, edges } = P.state, parent = new Array(n).fill(-2), adj = Array.from({ length: n }, () => []);
+  for (const [u, v] of edges) { adj[u].push(v); adj[v].push(u); }
+  parent[0] = -1; const todo = [0];
+  for (let i = 0; i < todo.length; i++) for (const y of adj[todo[i]]) if (parent[y] === -2) { parent[y] = todo[i]; todo.push(y); }
+  check(edges.length === n - 1 && nodes.every((nd, v) => v === 0 || nd.y > nodes[0].y), `tree n=${n}: the root, vertex 0, is the highest vertex`);
+  check(nodes.every((nd, v) => parent[v] < 0 || nd.y > nodes[parent[v]].y), `tree n=${n}: every vertex is below its parent`);
+  check(nodes.every((nd) => nd.x >= 50 && nd.x <= 950 && nd.y >= 40 && nd.y <= 600), `tree n=${n}: on the canvas`);
+}
+
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

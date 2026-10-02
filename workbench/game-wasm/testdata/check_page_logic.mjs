@@ -24,7 +24,7 @@ for (const [name, text] of [['site/index.html', html], ['docs/index.html', readF
 }
 const a = html.indexOf('// <page-logic>'), b = html.indexOf('// </page-logic>');
 if (a < 0 || b < a) throw new Error('the page-logic block was not found in site/index.html');
-const { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, RANDOM_FAMILIES, randomGraph, springLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, RANDOM_FAMILIES, randomGraph, springLayout, layoutArea };')();
+const { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, RANDOM_FAMILIES, randomGraph, springLayout, treeLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, RANDOM_FAMILIES, randomGraph, springLayout, treeLayout, layoutArea };')();
 
 let bad = 0;
 const check = (ok, what) => { if (!ok) { bad++; console.log('FAIL  ' + what); } };
@@ -226,6 +226,57 @@ same(refusal(() => randomGraph(2, seeded(1), 'tree')), null, 'two vertices make 
 const menu = html.match(/<select id="rfam"[^>]*>([\s\S]*?)<\/select>/)[1];
 same([...menu.matchAll(/<option value="(\w+)"/g)].map((m) => m[1]).sort(), Object.keys(RANDOM_FAMILIES).sort(), 'the menu offers exactly the families the generator has');
 for (const [key, f] of Object.entries(RANDOM_FAMILIES)) check(new RegExp(`<option value="${key}"[^>]*>[^<]*\\(${f.from}\\)</option>`).test(menu), `${key}: the menu names the first algorithm guaranteed, ${f.from}`);
+
+// 2e. a tree drawn as a tree: the root at the top, each level a row below, a parent above and centred over its children
+const parentsOf = (n, edges, root = 0) => { // by a breadth-first walk written here: parent and depth of every vertex
+  const adj = Array.from({ length: n }, () => []);
+  for (const [u, v] of edges) { adj[u].push(v); adj[v].push(u); }
+  const parent = new Array(n).fill(-2), depth = new Array(n).fill(0), todo = [root];
+  parent[root] = -1;
+  for (let i = 0; i < todo.length; i++) for (const y of adj[todo[i]]) if (parent[y] === -2) { parent[y] = todo[i]; depth[y] = depth[todo[i]] + 1; todo.push(y); }
+  return { parent, depth };
+};
+const closestPair = (pos) => { let c = Infinity; for (let i = 0; i < pos.length; i++) for (let j = i + 1; j < pos.length; j++) c = Math.min(c, Math.hypot(pos[i][0] - pos[j][0], pos[i][1] - pos[j][1])); return c; };
+const looksLikeATree = (n, edges, pos, w, h, what) => {
+  const { parent, depth } = parentsOf(n, edges);
+  check(pos.every(([x, y]) => x >= 0 && x <= w && y >= 0 && y <= h), `${what}: inside the box`);
+  check(n < 2 || closestPair(pos) >= 40, `${what}: no two vertices closer than 40 (closest ${n < 2 ? '-' : closestPair(pos).toFixed(1)})`);
+  check(n === 1 || pos.every(([, y], v) => v === 0 || y > pos[0][1]), `${what}: the root is above every other vertex`);
+  check(pos.every((p, v) => parent[v] < 0 || p[1] > pos[parent[v]][1]), `${what}: every vertex is below its parent`);
+  check(pos.every((p, u) => pos.every((q, v) => depth[u] >= depth[v] || p[1] < q[1])), `${what}: a vertex of a deeper level is always lower than one of a shallower level`);
+  const kids = Array.from({ length: n }, () => []);
+  parent.forEach((p, v) => { if (p >= 0) kids[p].push(v); });
+  check(kids.every((ks, u) => ks.length === 0 || Math.abs(pos[u][0] - (Math.min(...ks.map((k) => pos[k][0])) + Math.max(...ks.map((k) => pos[k][0]))) / 2) < 1e-9), `${what}: every parent is centred over its children`);
+};
+let treesDrawn = 0, treesNotDrawn = 0;
+for (let n = 2; n <= 32; n++) for (let seed = 1; seed <= 15; seed++) {
+  const g = randomGraph(n, seeded(n * 977 + seed), 'tree');
+  for (const h of [435, 560]) {
+    const pos = treeLayout(n, g.edges, 900, h);
+    if (pos === null) { treesNotDrawn++; continue; }
+    treesDrawn++; looksLikeATree(n, g.edges, pos, 900, h, `tree n=${n} seed=${seed} h=${h}`);
+  }
+}
+check(treesDrawn === 31 * 15 * 2 && treesNotDrawn === 0, `every random tree of 2 to 32 vertices is drawn as a tree (${treesDrawn} drawn, ${treesNotDrawn} not)`);
+// small cases whose positions can be written down
+same(treeLayout(3, [[0, 1], [0, 2]], 900, 435), [[450, 0], [0, 435], [900, 435]], 'a root with two children: the root centred on top, the children left and right below');
+same(treeLayout(4, [[0, 1], [1, 2], [2, 3]], 900, 435), [[450, 0], [450, 145], [450, 290], [450, 435]], 'a path from its end hangs straight down');
+same(treeLayout(1, [], 900, 435), [[450, 217.5]], 'a single vertex is in the middle');
+same(treeLayout(7, [[0, 1], [0, 2], [1, 3], [1, 4], [2, 5], [2, 6]], 900, 400), [[450, 0], [150, 200], [750, 200], [0, 400], [300, 400], [600, 400], [900, 400]], 'a binary tree of three levels: the leaves evenly spread, each parent centred over its children');
+// the extremes: a star of 31 leaves is too wide for one row, so every second leaf is dropped; a path of 32 is too deep for the box
+const star = Array.from({ length: 31 }, (_, i) => [0, i + 1]), starPos = treeLayout(32, star, 900, 435);
+check(starPos !== null, 'a star of 31 leaves is drawn, in a zigzag');
+if (starPos) {
+  looksLikeATree(32, star, starPos, 900, 435, 'star of 31 leaves');
+  check(new Set(starPos.slice(1).map((p) => p[1])).size === 2, 'the leaves of the star are in two rows, every second one dropped');
+}
+const longPath = Array.from({ length: 31 }, (_, i) => [i, i + 1]);
+same(treeLayout(32, longPath, 900, 435), null, 'a path of 32 vertices is too deep for the box: null, the caller uses another layout');
+const pathOf = (n) => Array.from({ length: n - 1 }, (_, i) => [i, i + 1]);
+same([treeLayout(11, pathOf(11), 900, 435) !== null, treeLayout(12, pathOf(12), 900, 435)], [true, null], 'a path fits the box up to 10 levels below the root (43.5 apart) and not 11 (39.5 apart)');
+same(treeLayout(21, pathOf(21), 900, 435, 10) !== null, true, 'a path of 21 vertices rooted in the middle is two arms of 10 levels and fits');
+same([treeLayout(4, [[0, 1], [1, 2], [0, 2]], 900, 435), treeLayout(4, [[0, 1], [1, 2], [0, 2], [2, 3]], 900, 435)], [null, null], 'not a tree (a cycle, or one edge too many): null');
+same(treeLayout(4, [[0, 1], [1, 2], [0, 2]].slice(0, 3), 900, 435), null, 'three edges on four vertices that leave a vertex out: null');
 
 // 2d. where a random graph may go: clear of the legend (top right) and the hint (bottom left), which are drawn over the canvas
 const legend = { left: 700, right: 990, top: 10, bottom: 61 }, hint = { left: 12, right: 370, top: 580, bottom: 630 };

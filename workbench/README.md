@@ -44,6 +44,9 @@ or newer.
   placed.  No vertex gets more than 15 neighbours (the engine's limit); the start vertex is 0; the graph is laid out by a
   spring layout so it can be read, inside the part of the canvas that the legend (top right) and the hint bar (bottom
   left) do not cover (they are measured after the new graph is drawn, since that can change the size of the canvas box).
+  A random tree is drawn as a tree: the start vertex is the root at the top, its children are in a row below it, theirs
+  below that, every parent centred over its children (a star too wide for one row has every second leaf dropped a little;
+  a tree too deep for the canvas, more than about ten levels, is drawn by the springs like the other graphs).
   "Any connected graph" is what the box gave before the families existed; it falls outside the A_US5 family often (about
   one graph in five at 10 vertices, about half at 32), which is when A_US5 can fail on it.  The rule, the colours and the
   rows in use are left alone.  A size outside the family's range (a cycle needs 3) is refused with a message and the
@@ -121,7 +124,9 @@ explore, and the algorithms with fewer colours must fail somewhere outside their
 algorithms of the second paper twice, once chosen as the rule and once as
 the code of its template, which must give the same play step for step; `check_page_logic.mjs` also checks the generator
 (connected, no repeated edge, at most 15 neighbours, different graphs each time, the extremes of the randomness), that
-every graph of each family is in its family (by a separate block decomposition) and the families nest, and that the layout puts no two vertices on top of each other, and that each template's colour constants and rule numbers
+every graph of each family is in its family (by a separate block decomposition) and the families nest, that a tree is
+drawn as a tree (the root highest, every vertex below its parent, parents centred, nobody closer than 40, also for a star and
+a path), and that the layout puts no two vertices on top of each other, and that each template's colour constants and rule numbers
 agree with the page's colour names and rule descriptions; `check_wasm_parity.mjs` also requires every preset that
 brings one of the algorithms of the papers to explore.
 
