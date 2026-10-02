@@ -64,36 +64,45 @@ or newer.
   three deterministic and N random adversary walks first, a cheap way to find
   a failure, never a proof of success.
 
-### The page in the paper model (A_Gen6)
+### The page in the paper model (A_Gen6, A_TC3, A_C4, A_US5)
 
-Choose `A_Gen6 (paper model, k=6)` under "answered by", load the template of the same name in the algorithm editor,
-or load one of the four `A_Gen6 ·` presets (the path, the triangle and the tree of the hand traces in
-`notes/agen6-hand-trace.xlsx`, and Sketch I; a preset asks before it replaces rows or an algorithm in use).  Any
-rule that can `stop` (a table row whose target is `stop`) is played the same way.  Then:
+Choose one of the four algorithms of the papers under "answered by" (`A_Gen6 (paper model, k=6)`, `A_TC3 ... k=3`,
+`A_C4 ... k=4`, `A_US5 ... k=5`; choosing one raises a palette that is too small), load the template of the same name in
+the algorithm editor, or load one of the presets: the four `A_Gen6 ·` ones (the path, the triangle and the tree of the
+hand traces in `notes/agen6-hand-trace.xlsx`, and Sketch I), `A_TC3 ·` on a 5-cycle and a binary tree, `A_C4 ·` on the
+two graphs of Figure 2 of its paper (a bridge with a 4-cycle, and K3,2), and `A_US5 ·` on K4 and on K4 with a tail (a preset
+asks before it replaces rows or an algorithm in use).  Any rule that can `stop` (a table row whose target is `stop`) is
+played the same way.  Then:
 
 * the play does not end when the last vertex is reached: it ends when the agent stops (or a position repeats), and
   the panel says what happened in the paper's terms: *Explores* (every vertex visited, stopped on the start vertex),
   *Stopped early* (the unvisited vertices are named and ringed), *Stopped away from the start*, or *Never stops*;
 * three separate indicators show **coverage** (vertices visited), **return** (on, or stopped on, the start vertex)
   and **termination** (running, stopped, never stops), live during the play;
-* the legend, the colour pickers and the ledger use the paper's colour names (init, path, fin, head1, head2, neigh),
-  and the Play tab shows which of the 11 rules answered the row just read, with a one-line description; the ledger
-  keeps the rule number of each step;
+* the legend, the colour pickers and the ledger use the algorithm's own colour names (A_Gen6: init, path, fin, head1,
+  head2, neigh; A_TC3: init, l0, l1; A_C4: init, fin, front, path; A_US5: init, path, neigh, fin, head; a colour the
+  algorithm does not use is called unused), and the Play tab shows which rule answered the row just read, with a
+  one-line description; the ledger keeps the rule of each step, tagged as in the paper (r5 for A_Gen6, D5, C9, U2 for
+  the others);
 * the Analysis tab says what failed, from the engine's own reason (never stops, stopped early, stopped away from the
   start) with the same three indicators, and a found execution can be replayed step by step;
 * the rules table and the define-row prompt offer `stop (paper model)` next to `stay`.
-* a hint next to the colours picker says how many colours the rule in use needs: A_Gen6 exactly six (shown in a
-  warning colour, with the current number, when fewer are chosen), flipsweep4 and 4b, flipsweep5 and 5d, eat3 and chase3
-  at least 4, 5 and 3; rules that work with any number have no hint.  The numbers are checked against the engine.
+* a hint next to the colours picker says how many colours the rule in use needs: the four algorithms of the papers
+  exactly six, three, four and five (shown in a warning colour, with the current number, when fewer are chosen, and
+  noting the unused ones when more), flipsweep4 and 4b, flipsweep5 and 5d, eat3 and chase3 at least 4, 5 and 3; rules
+  that work with any number have no hint.  The numbers are checked against the engine.
 
 The classic game keeps its own behaviour and wording.  `game-wasm/testdata/check_page_logic.mjs` compiles the script of
 both pages and holds the paper-model logic to the engine (for every paper-model fixture the page's verdict must equal
 the engine's reason and indicators); `check_page_play.mjs` runs the page's real script headlessly against the real
 engine and drives the Play tab (when a play ends, the banners and indicators, rule numbers, colour names, undo after a
 stop, replay) and the random graph button (every size from 2 to 32 gives a graph the engine accepts, on which A_Gen6
-survives the walks); `check_page_logic.mjs` also checks the generator (connected, no repeated edge, at most 15 neighbours,
-different graphs each time, the extremes of the randomness) and that the layout puts no two vertices on top of each
-other; `check_wasm_parity.mjs` also requires the A_Gen6 presets to explore.
+survives the walks), and plays each of the three algorithms of the second paper twice, once chosen as the rule and once as
+the code of its template, which must give the same play step for step; `check_page_logic.mjs` also checks the generator
+(connected, no repeated edge, at most 15 neighbours, different graphs each time, the extremes of the randomness) and
+that the layout puts no two vertices on top of each other, and that each template's colour constants and rule numbers
+agree with the page's colour names and rule descriptions; `check_wasm_parity.mjs` also requires every preset that
+brings one of the algorithms of the papers to explore.
 
 ## Command line (`explore`)
 
@@ -126,8 +135,8 @@ for WebAssembly.
 Native and WebAssembly are held to the same answers by the fixtures in `game-wasm/testdata/fixtures` (protocol
 requests with their expected JSON): `cargo test` runs them natively, and after `sh build.sh`,
 `node game-wasm/testdata/check_wasm_parity.mjs` sends the same requests to `site/game.wasm` and also checks that
-`docs/index.html` embeds that build.  `node game-wasm/testdata/check_agen6_template.mjs` checks the page's A_Gen6
-template against the engine's rule (action and rule number, for every row up to degree 4), ,
+`docs/index.html` embeds that build.  `node game-wasm/testdata/check_paper_templates.mjs` checks the page's template of each of the four
+algorithms against the engine's rule (action and rule number, for every row up to degree 4: 1,254, 102, 276 and 625 rows),
 `node game-wasm/testdata/check_page_logic.mjs` checks that the pages' scripts compile and their paper-model logic, and
 `node game-wasm/testdata/check_page_play.mjs` drives the Play tab headlessly.
 

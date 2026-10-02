@@ -24,7 +24,7 @@ for (const [name, text] of [['site/index.html', html], ['docs/index.html', readF
 }
 const a = html.indexOf('// <page-logic>'), b = html.indexOf('// </page-logic>');
 if (a < 0 || b < a) throw new Error('the page-logic block was not found in site/index.html');
-const { paperStatus, colourLabel, colourHint, COLOUR_NEED, AGEN6_COLOURS, AGEN6_RULES, randomGraph, springLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, AGEN6_COLOURS, AGEN6_RULES, randomGraph, springLayout, layoutArea };')();
+const { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, randomGraph, springLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, randomGraph, springLayout, layoutArea };')();
 
 let bad = 0;
 const check = (ok, what) => { if (!ok) { bad++; console.log('FAIL  ' + what); } };
@@ -45,30 +45,49 @@ same([s.covered, s.onStart, s.termination], [false, false, 'running'], 'the thre
 same(paperStatus(v({ stopped: true })).termination, 'stopped', 'termination: stopped');
 same(paperStatus(v({ cycle: true })).termination, 'never', 'termination: never');
 
-// 2. the colour names and the rule descriptions
-// the template's constants (INIT = 0, PATH = 1, ...) are what the engine agreement check pins to the engine's numbering
-const tpl = html.slice(html.indexOf('  agen6: `'));
-const consts = tpl.match(/const INIT = (\d), PATH = (\d), FIN = (\d), HEAD1 = (\d), HEAD2 = (\d), NEIGH = (\d);/);
-check(consts !== null, 'the template declares its colour constants on one line');
-if (consts) {
-  const names = ['init', 'path', 'fin', 'head1', 'head2', 'neigh'], byNumber = [];
-  names.forEach((nm, i) => { byNumber[+consts[i + 1]] = nm; });
-  same(AGEN6_COLOURS, byNumber, 'the page names colour n as the template does');
+// 2. the colour names, the rule numbers and the rule descriptions of every algorithm of the papers
+for (const key of ['agen6', 'atc3', 'ac4', 'aus5']) {
+  const open = `  ${key}: \``, start = html.indexOf(open), tpl = html.slice(start, html.indexOf('`,', start));
+  // the template's constants (INIT = 0, PATH = 1, ...) are what the engine agreement check pins to the engine's numbering
+  const consts = tpl.match(/\nconst ([A-Z0-9]+ = \d(?:, [A-Z0-9]+ = \d)*);/);
+  check(consts !== null, `${key}: the template declares its colour constants on one line`);
+  if (consts) {
+    const byNumber = [];
+    for (const m of consts[1].matchAll(/([A-Z0-9]+) = (\d)/g)) byNumber[+m[2]] = m[1].toLowerCase();
+    same(PAPER_ALGOS[key].colours, byNumber, `${key}: the page names colour n as the template does`);
+  }
+  // the rule numbers the template gives are exactly 1 to N, and each has a description
+  const rules = PAPER_ALGOS[key].rules, N = rules.length - 1;
+  same([...new Set([...tpl.matchAll(/rule: (\d+)/g)].map((m) => +m[1]))].sort((x, y) => x - y), Array.from({ length: N }, (_, i) => i + 1), `${key}: the template numbers its rules 1 to ${N}`);
+  check(rules[0] === null && rules.slice(1).every((t) => typeof t === 'string' && t.length > 10), `${key}: every rule has a description, and index 0 is unused`);
+  check(algoOfCode(tpl.slice(open.length)) === key, `${key}: the template is recognised by its first comment line`);
 }
-same([colourLabel(0, true), colourLabel(3, true), colourLabel(5, true)], ['init', 'head1', 'neigh'], 'named colours');
-same([colourLabel(0, false), colourLabel(4, false)], ['white', 'colour 4'], 'numbered colours');
-same(AGEN6_RULES.length, 12, 'rule descriptions for 1 to 11 (index 0 unused)');
-check(AGEN6_RULES.slice(1).every((t) => typeof t === 'string' && t.length > 10), 'every rule has a description');
-check(AGEN6_RULES[0] === null, 'index 0 is unused');
+same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.rules.length - 1])), { agen6: 11, atc3: 11, ac4: 14, aus5: 19 }, "the number of rules of each algorithm is the paper's (D1-D11, C1-C14, U1-U19)");
+same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.colours.length])), { agen6: 6, atc3: 3, ac4: 4, aus5: 5 }, 'and so is the number of colours');
+same(Object.keys(PAPER_ALGOS).every((key) => COLOUR_NEED[key].exact && COLOUR_NEED[key].n === PAPER_ALGOS[key].colours.length), true, "COLOUR_NEED states each algorithm's colour count");
+same([colourLabel(0, 'agen6'), colourLabel(3, 'agen6'), colourLabel(5, 'agen6')], ['init', 'head1', 'neigh'], 'named colours');
+same([colourLabel(1, 'atc3'), colourLabel(2, 'ac4'), colourLabel(4, 'aus5')], ['l0', 'front', 'head'], 'named colours of the other algorithms');
+same([colourLabel(0, null), colourLabel(4, null), colourLabel(0, 'sigma'), colourLabel(2, undefined)], ['white', 'colour 4', 'white', 'colour 2'], 'numbered colours');
+same([colourLabel(3, 'atc3'), colourLabel(5, 'ac4')], ['unused', 'unused'], "a colour beyond the algorithm's own is unused");
+same(colourLabel(1, 'constructor'), 'colour 1', 'a name that is not an algorithm is not looked up as one');
+same([ruleTag('agen6', 5), ruleTag('atc3', 5), ruleTag('ac4', 9), ruleTag('aus5', 2), ruleTag(null, 7), ruleTag('sigma', 7)], ['r5', 'D5', 'C9', 'U2', 'r7', 'r7'], "rule tags: the paper's letter, r for A_Gen6 and for numbers given by code");
+same([ruleText('atc3', 9).length > 10, ruleText('atc3', 12), ruleText('aus5', 19) !== null, ruleText(null, 1), ruleText('agen6', 0)], [true, null, true, null, null], 'rule texts, and none for a number the algorithm does not have');
+same([algoOfCode('// A_Gen6 (x)\nreturn null;'), algoOfCode('  // A_TC3 (y)'), algoOfCode('// A_C4 (z)'), algoOfCode('// A_US5 (w)'), algoOfCode('// my own rule'), algoOfCode(''), algoOfCode('// A_Gen7'), algoOfCode('return null; // A_TC3')], ['agen6', 'atc3', 'ac4', 'aus5', null, null, null, null], 'code is an algorithm only by its first comment line');
+
+same(['init', 'unused', 'Init', 'white', 'l0', 'head1', 'neigh', 'fin', 'front', 'path', 'colour 3'].map(article), ['an', 'an', 'an', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a'], 'a or an before a colour name');
 
 // 2b. the hint next to the colours picker
 same(colourHint('agen6', 6), { text: 'A_Gen6 needs 6 colours', warn: false }, 'A_Gen6 with six colours');
+same(colourHint('atc3', 3), { text: 'A_TC3 needs 3 colours', warn: false }, 'A_TC3 with three colours');
+same(colourHint('atc3', 5), { text: 'A_TC3 needs 3 colours (the other 2 unused)', warn: false }, 'more colours than the algorithm needs are unused, not a warning');
+same(colourHint('aus5', 4), { text: 'A_US5 needs 5 colours (now 4)', warn: true }, 'A_US5 with too few colours');
+same(colourHint('ac4', 4), { text: 'A_C4 needs 4 colours', warn: false }, 'A_C4 with four colours');
 same(colourHint('agen6', 3), { text: 'A_Gen6 needs 6 colours (now 3)', warn: true }, 'A_Gen6 with too few colours');
 same(colourHint('flipsweep4', 4), { text: 'flipsweep4 needs at least 4 colours', warn: false }, 'a minimum that is met');
 same(colourHint('flipsweep5', 4), { text: 'flipsweep5 needs at least 5 colours (now 4)', warn: true }, 'a minimum that is not met');
 same([colourHint('flipsweep5', 6).warn, colourHint('chase3', 2).warn, colourHint('eat3', 3).warn], [false, true, false], 'the boundary is k = n');
 same([colourHint('sigma', 2), colourHint('none', 5), colourHint('sweep', 3), colourHint(null, 6), colourHint('chasewhite', 2)], [null, null, null, null, null], 'rules that work with any number have no hint');
-same(Object.keys(COLOUR_NEED).sort(), ['agen6', 'chase3', 'eat3', 'flipsweep4', 'flipsweep4b', 'flipsweep5', 'flipsweep5d'], 'the rules with a stated need');
+same(Object.keys(COLOUR_NEED).sort(), ['ac4', 'agen6', 'atc3', 'aus5', 'chase3', 'eat3', 'flipsweep4', 'flipsweep4b', 'flipsweep5', 'flipsweep5d'], 'the rules with a stated need');
 
 // 2c. the random graph option: every size gives a connected graph the engine accepts, and a layout that can be read
 const seeded = (seed) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; // mulberry32

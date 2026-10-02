@@ -88,7 +88,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
     <button type="button" data-mode="start" aria-pressed="false" title="Click a vertex to make it the start (S)">Set start</button>
   </div>
   <div class="group"><label for="k">colours</label><select id="k"><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option></select><span id="khint" class="khint" role="status"></span></div>
-  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I (17)</option><option value="sketch2">Sketch II (14)</option><option value="paw">paw + pendant (k=2 killer)</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path (hand trace 1)</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle (hand trace 2)</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree (hand trace 3)</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="clear">empty canvas</option></select></div>
+  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I (17)</option><option value="sketch2">Sketch II (14)</option><option value="paw">paw + pendant (k=2 killer)</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path (hand trace 1)</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle (hand trace 2)</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree (hand trace 3)</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="atc3cycle" title="Selects the rule A_TC3 and three colours">A_TC3 · 5-cycle</option><option value="atc3tree" title="Selects the rule A_TC3 and three colours">A_TC3 · binary tree</option><option value="ac4fig2a" title="Selects the rule A_C4 and four colours">A_C4 · bridge + 4-cycle (Fig. 2a)</option><option value="ac4fig2b" title="Selects the rule A_C4 and four colours">A_C4 · K3,2 (Fig. 2b)</option><option value="aus5k4" title="Selects the rule A_US5 and five colours">A_US5 · K4</option><option value="aus5k4tail" title="Selects the rule A_US5 and five colours">A_US5 · K4 with a tail</option><option value="clear">empty canvas</option></select></div>
   <div class="group"><label for="rn">random graph</label><input type="number" id="rn" value="10" min="2" max="32" step="1" style="width:64px" title="How many vertices: 2 to 32"><button type="button" id="b-random" title="Replace the canvas with a new random connected graph of this many vertices">Generate</button></div>
   <div class="group"><button type="button" id="b-import-graph">Import / export graph</button></div>
   <div class="group small" id="wasm-status">loading engine…</div>
@@ -123,7 +123,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
     <section class="panel" id="panel-rules">
       <h2>Algorithm</h2>
       <p class="note">Write the rule as code: a function body receiving the row and returning the action. It is compiled into a table for every row up to the graph’s largest degree, so the engine and the exact game use exactly what you wrote. Rows in the table below still win over it.</p>
-      <div class="row"><label class="small" for="algo-preset">template</label><select id="algo-preset"><option value="">choose…</option><option value="sigma">σ* (readable form)</option><option value="sweep">sweep(c,t,p) with parameters</option><option value="flipsweep4">flipsweep4</option><option value="flipsweep4b">flipsweep4b</option><option value="flipsweep5">flipsweep5</option><option value="flipsweep5d">flipsweep5d</option><option value="eat3">eat3</option><option value="chase3">chase3</option><option value="chase">chase white, else stay</option><option value="agen6">A_Gen6 (paper, needs 6 colours)</option><option value="blank">blank with the API</option></select><button type="button" id="b-algo-compile" class="primary">Compile and use</button><button type="button" id="b-algo-off">Stop using</button><button type="button" id="b-algo-table" title="Copy the compiled rows into the table below, where each row can be changed">To table</button></div>
+      <div class="row"><label class="small" for="algo-preset">template</label><select id="algo-preset"><option value="">choose…</option><option value="sigma">σ* (readable form)</option><option value="sweep">sweep(c,t,p) with parameters</option><option value="flipsweep4">flipsweep4</option><option value="flipsweep4b">flipsweep4b</option><option value="flipsweep5">flipsweep5</option><option value="flipsweep5d">flipsweep5d</option><option value="eat3">eat3</option><option value="chase3">chase3</option><option value="chase">chase white, else stay</option><option value="agen6">A_Gen6 (paper, needs 6 colours)</option><option value="atc3">A_TC3 (trees and cycles, 3 colours)</option><option value="ac4">A_C4 (cycle and bipartite blocks, 4 colours)</option><option value="aus5">A_US5 (clique or triangle-free blocks, 5 colours)</option><option value="blank">blank with the API</option></select><button type="button" id="b-algo-compile" class="primary">Compile and use</button><button type="button" id="b-algo-off">Stop using</button><button type="button" id="b-algo-table" title="Copy the compiled rows into the table below, where each row can be changed">To table</button></div>
       <textarea id="algo" spellcheck="false" style="min-height:190px" placeholder="if (has(W)) return { paint: 1, target: W };&#10;..."></textarea>
       <div id="algo-status" class="note"></div>
       <h2>Undefined rows</h2>
@@ -140,6 +140,9 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
           <option value="chase3">chase3 (k≥3)</option>
           <option value="chasewhite">chase white, else stay</option>
           <option value="agen6">A_Gen6 (paper model, k=6)</option>
+          <option value="atc3">A_TC3 (paper model, k=3)</option>
+          <option value="ac4">A_C4 (paper model, k=4)</option>
+          <option value="aus5">A_US5 (paper model, k=5)</option>
         </select>
         <span id="sweepparams" hidden>c <select id="sw-c"></select> t <select id="sw-t"></select> p <select id="sw-p"></select></span>
         <button type="button" id="b-edit-default" title="Load this rule's code into the algorithm editor, compile it, and use it">Edit this rule as code</button>
@@ -185,7 +188,9 @@ const CNAME = ['white', 'colour 1', 'colour 2', 'colour 3', 'colour 4', 'colour 
 
 // <page-logic> pure functions, no DOM and no state: checked by game-wasm/testdata/check_page_logic.mjs,
 // which also holds them to the engine's own verdicts.
-// A_Gen6 (Takahashi et al., Algorithm 2): the names of its six colours and what each rule does.
+// The algorithms of the papers the page knows by name: the names of their colours (numbered as the papers list them) and
+// what each rule does.  A_Gen6: Takahashi et al., Algorithm 2.  A_TC3, A_C4, A_US5: Hiraoka et al., Algorithms 1 to 3, whose
+// rules are D1-D11, C1-C14 and U1-U19; the numbers below are those rules' numbers without the letter.
 const AGEN6_COLOURS = ['init', 'path', 'fin', 'head1', 'head2', 'neigh'];
 const AGEN6_RULES = [null,
   'a probed vertex touching the path would make a chord: mark it neigh and go back to the head',
@@ -199,8 +204,79 @@ const AGEN6_RULES = [null,
   'nothing left at the start: become fin and stop',
   'back on a path vertex: it becomes the head again',
   'a rejected neighbour: reset it to init and return to the head'];
-// The label of colour c: its name when the rule names its colours, else white / colour c.
-function colourLabel(c, named) { return named ? AGEN6_COLOURS[c] : c === 0 ? 'white' : 'colour ' + c; }
+const ATC3_COLOURS = ['init', 'l0', 'l1'];
+const ATC3_RULES = [null,
+  'no neighbour at all: become l1 and stop',
+  'the start vertex, all neighbours init: become l0 and enter one',
+  'probe: become l1 and enter an init child',
+  'the probed child has children of its own: undo it (init) and go back',
+  'the probed child is a leaf: become l1 and go back',
+  'a leaf entered from its parent: become l1 and go back to it',
+  'an unfinished child subtree is left: enter it',
+  'everything below is done: become l1 and go back to the l0 neighbour',
+  'back on the start with everything done: become l1 and stop',
+  'after a probe an unfinished subtree is left: become l0 and enter it',
+  'nothing left below: stay l1 and go back to the l0 neighbour'];
+const AC4_COLOURS = ['init', 'fin', 'front', 'path'];
+const AC4_RULES = [null,
+  'only fin (or nothing) around: become fin and stop',
+  'every neighbour init: become front and enter one',
+  'entered from a path vertex with nothing to explore: become fin and go back to it',
+  'entered from a front vertex with nothing to explore: become fin and go back to it',
+  'between a front and a path vertex: become path and move on to an init neighbour',
+  'entered from a path vertex: become front and move on to an init neighbour',
+  'entered from a front vertex: become front and go back to it',
+  'a front vertex that sees the new front: become path and move to it',
+  'advance: stay front and enter an init neighbour',
+  'nothing left to enter: become fin and go to a path neighbour',
+  'a path vertex, no front around, an init neighbour left: become front and enter it',
+  'a path vertex with front and init neighbours: stay path and enter an init one',
+  'a path vertex whose block is done: become fin and go to the front neighbour',
+  'a path vertex heading back: become fin and go to a path neighbour'];
+const AUS5_COLOURS = ['init', 'path', 'neigh', 'fin', 'head'];
+const AUS5_RULES = [null,
+  'the start vertex, all neighbours init: become path and enter one',
+  'the predecessor, init for a moment, sees marks and no head: become path again',
+  'a candidate touching the path would make a chord: mark it neigh and go back to the head',
+  'a candidate touching no path vertex: become head and go back to the old head',
+  'the first vertex after the start: become head',
+  'backtracking through a clique: finish the head and go to the predecessor, init for a moment',
+  'two heads and a mark: go to the mark to restore it',
+  'marks restored: become path and move to the new head',
+  'backtracking, marks restored: finish this head and go to the predecessor',
+  'scan: enter the next init neighbour',
+  'nothing to scan: go back to the predecessor on the path',
+  'at the start with nothing yet: become path and enter an init neighbour',
+  'nothing left at the start: become fin and stop',
+  'predecessor with marks and the head around: become init and go to the head',
+  'predecessor with marks and no head: go to a mark to restore it',
+  'no head left: become the head again',
+  'predecessor next to the head, no marks: become head and go back to it',
+  'a mark next to the path: become init and go to the path vertex',
+  'a mark: become init and go back to the head'];
+// By key (the name used in requests, `default NAME`): the colour names, the rule descriptions and the letter the paper puts
+// before a rule number (none for A_Gen6).
+const PAPER_ALGOS = {
+  agen6: { colours: AGEN6_COLOURS, rules: AGEN6_RULES, prefix: '' },
+  atc3: { colours: ATC3_COLOURS, rules: ATC3_RULES, prefix: 'D' },
+  ac4: { colours: AC4_COLOURS, rules: AC4_RULES, prefix: 'C' },
+  aus5: { colours: AUS5_COLOURS, rules: AUS5_RULES, prefix: 'U' },
+};
+function paperAlgo(key) { return Object.prototype.hasOwnProperty.call(PAPER_ALGOS, key) ? PAPER_ALGOS[key] : null; }
+// The label of colour c: its name when the algorithm in use names its colours (a colour beyond its list is unused), else
+// white / colour c.
+function colourLabel(c, algo) { const a = paperAlgo(algo); return a ? a.colours[c] || 'unused' : c === 0 ? 'white' : 'colour ' + c; }
+// The tag of rule n in the ledger: D5, C9, U2 for the rules of Hiraoka et al., r5 for A_Gen6 and for numbers given by code.
+function ruleTag(algo, n) { const a = paperAlgo(algo); return a && a.prefix ? a.prefix + n : 'r' + n; }
+// "a" or "an" before the colour name word ("an init neighbour", "a head neighbour").
+function article(word) { return /^[aeiou]/i.test(word) ? 'an' : 'a'; }
+// What rule n of the algorithm does (null if it has no description).
+function ruleText(algo, n) { const a = paperAlgo(algo); return a && a.rules[n] ? a.rules[n] : null; }
+// The algorithm a piece of code is, by the name its first comment line starts with (the templates do); else null.
+function algoOfCode(code) {
+  const m = /^\s*\/\/\s*(A_Gen6|A_TC3|A_C4|A_US5)\b/.exec(code || '');
+  return m ? Object.keys(COLOUR_NEED).find((key) => COLOUR_NEED[key].name === m[1]) : null;
+}
 // Exploring in the paper model (Definition 1 of Takahashi et al.) has three parts, kept apart:
 // coverage (every vertex visited), return (the agent is on the start vertex) and termination (it stops).
 // v: { visited, n, cur, start, stopped, cycle }.  The outcome is 'running' until the agent stops or the
@@ -214,10 +290,12 @@ function paperStatus(v) {
   else if (v.cycle) outcome = 'never_stops';
   return { covered, onStart, termination, outcome };
 }
-// How many colours a rule needs (checked against the engine by testdata/check_wasm_parity.mjs): A_Gen6 exactly six,
-// some built-in rules at least so many; the other rules work with any number and are not listed.
+// How many colours a rule needs (checked against the engine by testdata/check_wasm_parity.mjs): the algorithms of the
+// papers exactly their number (more colours are left unused), some built-in rules at least so many; the other rules
+// work with any number and are not listed.
 const COLOUR_NEED = {
   agen6: { n: 6, exact: true, name: 'A_Gen6' },
+  atc3: { n: 3, exact: true, name: 'A_TC3' }, ac4: { n: 4, exact: true, name: 'A_C4' }, aus5: { n: 5, exact: true, name: 'A_US5' },
   flipsweep4: { n: 4, name: 'flipsweep4' }, flipsweep4b: { n: 4, name: 'flipsweep4b' },
   flipsweep5: { n: 5, name: 'flipsweep5' }, flipsweep5d: { n: 5, name: 'flipsweep5d' },
   eat3: { n: 3, name: 'eat3' }, chase3: { n: 3, name: 'chase3' },
@@ -227,7 +305,8 @@ function colourHint(rule, k) {
   const need = COLOUR_NEED[rule];
   if (!need) return null;
   const text = need.exact ? `${need.name} needs ${need.n} colours` : `${need.name} needs at least ${need.n} colours`;
-  return k < need.n ? { text: `${text} (now ${k})`, warn: true } : { text, warn: false };
+  if (k < need.n) return { text: `${text} (now ${k})`, warn: true };
+  return { text: need.exact && k > need.n ? `${text} (the other ${k - need.n} unused)` : text, warn: false };
 }
 // A random connected graph with n vertices (2 to 32, the engine's limit), as the text "n 0 u-v,u-v,..." (start vertex 0)
 // and as the list of its edges: a random spanning tree (every vertex after the first joins a random earlier one), then
@@ -374,6 +453,14 @@ const PRESETS = {
   agen6path: { text: '3 0 0-1,1-2', k: 6, def: 'agen6', coords: [[200,320],[500,320],[800,320]], box: [1000, 640] },
   agen6triangle: { text: '3 0 0-1,1-2,0-2', k: 6, def: 'agen6', coords: [[500,170],[280,470],[720,470]], box: [1000, 640] },
   agen6tree: { text: '4 0 0-1,0-2,1-3', k: 6, def: 'agen6', coords: [[250,320],[500,190],[500,450],[750,190]], box: [1000, 640] },
+  // A_TC3, A_C4 and A_US5 (Hiraoka et al.): a graph of each one's class, with the rule chosen and its colours.  The two
+  // A_C4 graphs are the ones of Figure 2 of the paper.
+  atc3cycle: { text: '5 0 0-1,1-2,2-3,3-4,0-4', k: 3, def: 'atc3', coords: [[500,90],[719,249],[635,515],[365,515],[281,249]], box: [1000, 640] },
+  atc3tree: { text: '7 0 0-1,0-2,1-3,1-4,2-5,2-6', k: 3, def: 'atc3', coords: [[500,90],[280,260],[720,260],[170,450],[390,450],[610,450],[830,450]], box: [1000, 640] },
+  ac4fig2a: { text: '5 0 0-1,1-2,2-3,3-4,1-4', k: 4, def: 'ac4', coords: [[130,320],[330,320],[500,170],[670,320],[500,470]], box: [1000, 640] },
+  ac4fig2b: { text: '5 0 0-3,0-4,1-3,1-4,2-3,2-4', k: 4, def: 'ac4', coords: [[260,170],[260,320],[260,470],[740,245],[740,395]], box: [1000, 640] },
+  aus5k4: { text: '4 0 0-1,0-2,0-3,1-2,1-3,2-3', k: 5, def: 'aus5', coords: [[300,170],[700,170],[700,470],[300,470]], box: [1000, 640] },
+  aus5k4tail: { text: '6 0 0-1,0-2,0-3,1-2,1-3,2-3,2-4,4-5', k: 5, def: 'aus5', coords: [[150,170],[450,170],[450,470],[150,470],[650,320],[850,320]], box: [1000, 640] },
 };
 PRESETS.agen6sketch1 = { ...PRESETS.sketch1, k: 6, def: 'agen6' };
 
@@ -495,6 +582,100 @@ if (own === HEAD2) {
 if (own === PATH) return { paint: HEAD1, target: 'stay', rule: 10 };  // rule 10
 if (own === NEIGH) return { paint: INIT, target: HEAD2, rule: 11 };   // rule 11
 return null;                                                 // fin: no rule`,
+  atc3: `// A_TC3 (Hiraoka, Imori, Takahashi, Sudo, arXiv 2609.14356, Algorithm 1), three colours, paper model.
+// 0 init, 1 l0, 2 l1.  Rule numbers are the paper's D1 to D11.  Needs 3 colours.
+// Every tree and every simple cycle, in O(n) moves, stopping on the start vertex.  On a tree a vertex probes an init child
+// (D3): a leaf child finishes itself (D5), a child with children of its own goes straight back (D4) and is entered properly
+// later (D10, D7).  On a cycle the agent walks round painting l0, turns, and paints the way back l1 (D8) to the start (D9).
+// Where the paper gives no output (observations it proves unreachable) the code returns null: the row stays undefined.
+// (No backticks in this comment: the template is itself a template literal.)
+const INIT = 0, L0 = 1, L1 = 2;
+if (own === INIT) {
+  if (!has(INIT) && !has(L0) && !has(L1)) return { paint: L1, target: 'stop', rule: 1 };   // D1: no neighbour at all
+  if (has(INIT) && !has(L0) && !has(L1)) return { paint: L0, target: INIT, rule: 2 };      // D2: the start vertex
+  if (has(INIT) && has(L0)) return { paint: L1, target: INIT, rule: 3 };                   // D3: probe an init child
+  if (has(INIT) && has(L1)) return { paint: INIT, target: L1, rule: 4 };                   // D4: the child has children: undo, go back
+  if (has(L1)) return { paint: L1, target: L1, rule: 5 };                                  // D5: the child is a leaf: finish it, go back
+  if (has(L0)) return { paint: L1, target: L0, rule: 6 };                                  // D6: a leaf entered from its parent
+  return null;
+}
+if (own === L0) {
+  if (has(INIT) && has(L1)) return { paint: L0, target: INIT, rule: 7 };                   // D7
+  if (has(L0) && has(L1)) return { paint: L1, target: L0, rule: 8 };                       // D8
+  if (has(L1) && !has(INIT) && !has(L0)) return { paint: L1, target: 'stop', rule: 9 };    // D9: stop on the start
+  return null;
+}
+if (own === L1) {
+  if (has(INIT) && has(L0)) return { paint: L0, target: INIT, rule: 10 };                  // D10
+  if (has(L0) && has(L1)) return { paint: L1, target: L0, rule: 11 };                      // D11
+  return null;
+}
+return null;`,
+  ac4: `// A_C4 (Hiraoka, Imori, Takahashi, Sudo, arXiv 2609.14356, Algorithm 2), four colours, paper model.
+// 0 init, 1 fin, 2 front, 3 path.  Rule numbers are the paper's C1 to C14.  Needs 4 colours.
+// Every graph whose blocks are cycles or complete bipartite graphs (all cacti), in O(n) moves.  It explores one block at a
+// time along the block-cut tree: front marks the tip of the explored part of a block, path the rest of it, fin a finished vertex.
+// The paper defines no rule for fin (it is never requested, so the agent is never on one) and none for an init vertex seeing
+// only init and fin: the code returns null and the row stays undefined.
+// (No backticks in this comment: the template is itself a template literal.)
+const INIT = 0, FIN = 1, FRONT = 2, PATH = 3;
+if (own === FIN || own > PATH) return null;                                              // fin: no rule
+if (!has(INIT) && !has(FRONT) && !has(PATH)) return { paint: FIN, target: 'stop', rule: 1 };   // C1
+if (!has(FIN) && !has(FRONT) && !has(PATH)) return { paint: FRONT, target: INIT, rule: 2 };    // C2
+if (own === INIT) {
+  if (!has(FRONT) && !has(INIT)) return { paint: FIN, target: PATH, rule: 3 };           // C3
+  if (!has(INIT)) return { paint: FIN, target: FRONT, rule: 4 };                         // C4
+  if (has(FRONT) && has(PATH)) return { paint: PATH, target: INIT, rule: 5 };            // C5
+  if (has(PATH)) return { paint: FRONT, target: INIT, rule: 6 };                         // C6
+  if (has(FRONT)) return { paint: FRONT, target: FRONT, rule: 7 };                       // C7
+  return null;                                                                           // only init and fin around: unreachable
+}
+if (own === FRONT) {
+  if (has(FRONT)) return { paint: PATH, target: FRONT, rule: 8 };                        // C8
+  if (has(INIT)) return { paint: FRONT, target: INIT, rule: 9 };                         // C9
+  return { paint: FIN, target: PATH, rule: 10 };                                         // C10
+}
+if (!has(FRONT) && has(INIT)) return { paint: FRONT, target: INIT, rule: 11 };           // C11 (own is path)
+if (has(FRONT) && has(INIT)) return { paint: PATH, target: INIT, rule: 12 };             // C12
+if (has(FRONT)) return { paint: FIN, target: FRONT, rule: 13 };                          // C13
+return { paint: FIN, target: PATH, rule: 14 };                                           // C14`,
+  aus5: `// A_US5 (Hiraoka, Imori, Takahashi, Sudo, arXiv 2609.14356, Algorithm 3), five colours, paper model.
+// 0 init, 1 path, 2 neigh, 3 fin, 4 head.  Rule numbers are the paper's U1 to U19.  Needs 5 colours.
+// Every graph whose blocks are cliques or triangle-free, in O(n * maximum degree) moves.  The same semi-DFS as A_Gen6 with
+// fewer colours: the head scans its init neighbours one at a time (U10); a candidate that touches the path is marked neigh
+// (U3), another becomes the new head (U4); the marks are cleaned up before the head moves on (U7, U19, U8) or backs up (U9,
+// U11).  Rules U2, U6, U14-U16 and U18 are the new ones: they let the cleanup run through the predecessor when it and the
+// head lie in a clique.  The paper defines no rule for fin: the code returns null and the row stays undefined.
+// (No backticks in this comment: the template is itself a template literal.)
+const INIT = 0, PATH = 1, NEIGH = 2, FIN = 3, HEAD = 4;
+if (own === INIT) {
+  if (has(INIT) && !has(PATH) && !has(NEIGH) && !has(FIN) && !has(HEAD)) return { paint: PATH, target: INIT, rule: 1 };  // U1
+  if (has(NEIGH) && !has(HEAD)) return { paint: PATH, target: 'stay', rule: 2 };         // U2
+  if (has(HEAD) && has(PATH)) return { paint: NEIGH, target: HEAD, rule: 3 };            // U3
+  if (has(HEAD) && !has(PATH)) return { paint: HEAD, target: HEAD, rule: 4 };            // U4
+  return { paint: HEAD, target: 'stay', rule: 5 };                                       // U5
+}
+if (own === HEAD) {
+  if (has(INIT) && has(NEIGH) && !has(PATH) && !has(HEAD)) return { paint: FIN, target: INIT, rule: 6 };  // U6
+  if (has(HEAD) && has(NEIGH)) return { paint: HEAD, target: NEIGH, rule: 7 };           // U7
+  if (has(HEAD) && has(PATH)) return { paint: PATH, target: HEAD, rule: 8 };             // U8
+  if (has(HEAD)) return { paint: FIN, target: HEAD, rule: 9 };                           // U9
+  if (has(PATH) && has(INIT)) return { paint: HEAD, target: INIT, rule: 10 };            // U10
+  if (has(PATH)) return { paint: HEAD, target: PATH, rule: 11 };                         // U11
+  if (has(INIT)) return { paint: PATH, target: INIT, rule: 12 };                         // U12
+  return { paint: FIN, target: 'stop', rule: 13 };                                       // U13
+}
+if (own === PATH) {
+  if (has(NEIGH) && has(HEAD)) return { paint: INIT, target: HEAD, rule: 14 };           // U14
+  if (has(NEIGH)) return { paint: PATH, target: NEIGH, rule: 15 };                       // U15
+  if (!has(HEAD)) return { paint: HEAD, target: 'stay', rule: 16 };                      // U16
+  return { paint: HEAD, target: HEAD, rule: 17 };                                        // U17
+}
+if (own === NEIGH) {
+  if (has(PATH) && !has(HEAD)) return { paint: INIT, target: PATH, rule: 18 };           // U18
+  return { paint: INIT, target: HEAD, rule: 19 };                                        // U19
+}
+return null;                                                                             // fin: no rule`,
   blank: `// The row: own (your colour, 0 = white), bag (an array: bag[c] = how many
 // neighbours carry colour c), k (number of colours), deg (number of neighbours).
 // Helpers: W = 0, has(c) (is colour c in the bag?), nxt(c) and prv(c) (the
@@ -618,9 +799,9 @@ function resetPlay() {
   if (state.play) computePending();
 }
 function posKey(p) { return p.colours.join(',') + '|' + p.cur + '|' + [...p.vis].sort((a, b) => a - b).join(','); }
-// The paper model (a rule that can stop, or A_Gen6): exploring also needs the agent to return to the start and stop,
-// so reaching the last vertex does not end the play; the classic game ends there.
-function paperMode() { return state.def === 'agen6' || usesStop(); }
+// The paper model (a rule that can stop, or one of the algorithms of the papers): exploring also needs the agent to return
+// to the start and stop, so reaching the last vertex does not end the play; the classic game ends there.
+function paperMode() { return paperAlgo(state.def) !== null || usesStop(); }
 function computePending() {
   const p = state.play; p.pending = null;
   if (!paperMode() && p.vis.size === state.nodes.length) { p.done = { kind: 'explored' }; return; }
@@ -684,17 +865,19 @@ function loadReplay(trace) { resetPlay(); state.replay = { steps: trace.steps, i
 const NAMES = (i) => String(i);
 function renderColourHint() {
   const code = state.algoSrc || '';
-  const rule = code ? (/^\s*\/\/\s*A_Gen6\b/.test(code) ? 'agen6' : null) : state.def;
+  const rule = code ? algoOfCode(code) : state.def;
   const h = colourHint(rule, state.k), el = $('#khint');
   el.textContent = h ? h.text : ''; el.className = 'khint' + (h && h.warn ? ' warn' : '');
 }
 function render() { renderGraph(); renderPlay(); renderRules(); renderLegend(); renderHint(); renderColourHint(); }
-// A_Gen6 names its six colours (init, path, ...): used whenever the rule in use is A_Gen6
-function namedColours() {
-  const code = state.algoSrc || ''; // code in use answers before the fallback: its colours are A_Gen6's only if it is the A_Gen6 template
-  return code ? /^\s*\/\/\s*A_Gen6\b/.test(code) : state.def === 'agen6';
+// The algorithm of the papers in use, or null: it names its colours (init, path, ...) and numbers its rules.  Code in use
+// answers before the fallback, so its colours are an algorithm's only if it is that algorithm's template.
+function activeAlgo() {
+  const code = state.algoSrc || '';
+  return code ? algoOfCode(code) : paperAlgo(state.def) ? state.def : null;
 }
-function cname(c) { return colourLabel(c, namedColours()); }
+function namedColours() { return activeAlgo() !== null; }
+function cname(c) { return colourLabel(c, activeAlgo()); }
 function renderLegend() { $('#legend').innerHTML = [...Array(state.k).keys()].map((c) => `<span><span class="sw" style="background:${PAL[c]}"></span>${namedColours() ? cname(c) : c === 0 ? 'white' : c}</span>`).join('') + '<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent</span><span><span class="sw" style="border:2px dashed var(--bad)"></span>never visited</span>'; }
 function renderHint() {
   const h = { node: 'Click on empty space to add a vertex.', edge: state.edgeFrom === null ? 'Click a vertex, then another, to join them.' : `Now click the vertex to join with ${state.edgeFrom} (click it again to cancel).`, move: 'Drag vertices to arrange the drawing.', delete: 'Click a vertex or an edge to remove it.', start: 'Click the vertex where the agent starts.' }[state.mode];
@@ -760,9 +943,9 @@ function renderPlay() {
       <p class="note">The row goes into the table (Rules tab) and the play resumes.</p>`;
   } else if (p.pending) {
     const pd = p.pending;
-    s += `<div class="row small">reads <span class="mono">${pd.row}</span> ${bagChips(pd.row)} <span style="color:var(--soft)">(${pd.source}${pd.rule ? ` · rule ${pd.rule}` : ''})</span></div>`;
-    if (pd.rule && namedColours() && AGEN6_RULES[pd.rule]) s += `<div class="row small note">rule ${pd.rule}: ${AGEN6_RULES[pd.rule]}</div>`;
-    s += `<div class="row small">paints <span class="sw" style="background:${PAL[pd.paint]}"></span>${cname(pd.paint)}, then ${pd.target === -2 ? '<b>stops</b> (paper model)' : pd.target === -1 ? 'stays' : pd.options.length === 0 ? `no ${cname(pd.target)} neighbour: stays` : `moves to a <b>${cname(pd.target)}</b> neighbour`}</div>`;
+    s += `<div class="row small">reads <span class="mono">${pd.row}</span> ${bagChips(pd.row)} <span style="color:var(--soft)">(${pd.source}${pd.rule ? ` · rule ${ruleTag(activeAlgo(), pd.rule).replace(/^r/, '')}` : ''})</span></div>`;
+    if (pd.rule && ruleText(activeAlgo(), pd.rule)) s += `<div class="row small note">rule ${ruleTag(activeAlgo(), pd.rule).replace(/^r/, '')}: ${ruleText(activeAlgo(), pd.rule)}</div>`;
+    s += `<div class="row small">paints <span class="sw" style="background:${PAL[pd.paint]}"></span>${cname(pd.paint)}, then ${pd.target === -2 ? '<b>stops</b> (paper model)' : pd.target === -1 ? 'stays' : pd.options.length === 0 ? `no ${cname(pd.target)} neighbour: stays` : `moves to ${article(cname(pd.target))} <b>${cname(pd.target)}</b> neighbour`}</div>`;
     if (pd.options.length) s += `<div class="row small">adversary may serve: ${pd.options.map((u) => `<b>${NAMES(u)}</b>`).join(', ')}${pd.options.length >= 2 ? ` · auto would pick <b>${NAMES(pd.auto)}</b>` : ''}</div>`;
     if (pd.options.length >= 2 && !(state.replay && state.replay.index < state.replay.steps.length)) s += `<div class="banner neutral" id="choicehint">Your move as the adversary: click a highlighted vertex (or Auto step).</div>`;
   } else if (p.done) {
@@ -777,7 +960,7 @@ function renderPlay() {
   const tb = $('#ledger tbody'); let rows = '';
   const cycFrom = p.done && p.done.kind === 'confined' ? p.done.repeatAt : (state.replay && state.replay.index >= state.replay.steps.length ? state.replay.repeatAt : null);
   p.steps.forEach((st, i) => {
-    rows += `<tr class="${cycFrom !== null && cycFrom !== undefined && i >= cycFrom ? 'cycle' : ''}"><td class="mono">${i}</td><td><b>${NAMES(st.cur)}</b></td><td><span class="mono">${st.row}</span> ${bagChips(st.row)}${st.rule ? ` <span class="small" title="${namedColours() && AGEN6_RULES[st.rule] ? AGEN6_RULES[st.rule] : 'rule ' + st.rule}">· r${st.rule}</span>` : ''}</td><td><span class="sw" style="background:${PAL[st.paint]}"></span>${st.target === -1 ? 'stay' : st.target === -2 ? '■ stop' : '→ ' + cname(st.target)}</td><td>${st.options.map(NAMES).join(', ') || '—'}</td><td>${st.next === null ? (st.target === -2 ? 'stops' : 'stays') : `<b>${NAMES(st.next)}</b>${st.options.length >= 2 ? ' ◆' : ''}`}</td></tr>`;
+    rows += `<tr class="${cycFrom !== null && cycFrom !== undefined && i >= cycFrom ? 'cycle' : ''}"><td class="mono">${i}</td><td><b>${NAMES(st.cur)}</b></td><td><span class="mono">${st.row}</span> ${bagChips(st.row)}${st.rule ? ` <span class="small" title="${ruleText(activeAlgo(), st.rule) || 'rule ' + st.rule}">· ${ruleTag(activeAlgo(), st.rule)}</span>` : ''}</td><td><span class="sw" style="background:${PAL[st.paint]}"></span>${st.target === -1 ? 'stay' : st.target === -2 ? '■ stop' : '→ ' + cname(st.target)}</td><td>${st.options.map(NAMES).join(', ') || '—'}</td><td>${st.next === null ? (st.target === -2 ? 'stops' : 'stays') : `<b>${NAMES(st.next)}</b>${st.options.length >= 2 ? ' ◆' : ''}`}</td></tr>`;
   });
   // follow the newest step inside the ledger's own box, but only if it was already at the bottom (not while you read
   // older rows), and never scroll the panel or the page: scrollIntoView on the last row did that at every step
@@ -918,7 +1101,7 @@ $('#b-random').addEventListener('click', makeRandomGraph);
 $('#rn').addEventListener('keydown', (e) => { if (e.key === 'Enter') makeRandomGraph(); });
 $('#b-graph-close').addEventListener('click', () => $('#graphdialog').close());
 $('#b-graph-apply').addEventListener('click', () => { try { loadGraphText($('#graphtext').value); $('#graphdialog').close(); } catch (err) { alert(err.message); } });
-$('#default').addEventListener('change', (e) => { state.def = e.target.value; if (state.def === 'agen6' && state.k < 6) { state.k = 6; $('#k').value = 6; } save(); resetPlay(); render(); });
+$('#default').addEventListener('change', (e) => { state.def = e.target.value; if (paperAlgo(state.def) && state.k < COLOUR_NEED[state.def].n) { state.k = COLOUR_NEED[state.def].n; $('#k').value = state.k; } save(); resetPlay(); render(); });
 ['sw-c', 'sw-t', 'sw-p'].forEach((id, j) => $('#' + id).addEventListener('change', (e) => { state.sweep[j] = +e.target.value; save(); resetPlay(); render(); }));
 $('#b-addrow').addEventListener('click', () => { const r = $('#newrow').value.trim(); if (!/^\d+\.[0-9a-f]+$/.test(r)) { alert('A row looks like 1.2010: own colour, a dot, one digit per colour.'); return; } state.table.set(r, { paint: +$('#newpaint').value, target: +$('#newtarget').value }); $('#newrow').value = ''; save(); resetPlay(); render(); });
 $('#b-table-import').addEventListener('click', () => { try { state.table = parseTableText($('#tabletext').value); save(); resetPlay(); render(); } catch (err) { alert(err.message); } });

@@ -1822,11 +1822,12 @@ mod tests {
     }
 
     #[test]
-    fn agen6_rows_match_the_page_template() {
-        // testdata/agen6_rows_deg4.txt is produced by the page's JavaScript template
-        // (`node testdata/check_agen6_template.mjs --write`); every row up to degree 4, six colours.
-        fn bags(c: usize, left: u8, cnt: &mut [u8; MAXK], out: &mut Vec<[u8; MAXK]>) {
-            if c == MAXK {
+    fn paper_algorithms_match_the_page_templates() {
+        // testdata/NAME_rows_deg4.txt is produced by the page's JavaScript template of each algorithm
+        // (`node testdata/check_paper_templates.mjs --write`): every row up to degree 4 with the algorithm's colours,
+        // its action and the number of the paper's rule, or `undefined`.  The engine must give the same, row for row.
+        fn bags(c: usize, k: usize, left: u8, cnt: &mut [u8; MAXK], out: &mut Vec<[u8; MAXK]>) {
+            if c == k {
                 if cnt.iter().sum::<u8>() >= 1 {
                     out.push(*cnt);
                 }
@@ -1834,27 +1835,36 @@ mod tests {
             }
             for x in 0..=left {
                 cnt[c] = x;
-                bags(c + 1, left - x, cnt, out);
+                bags(c + 1, k, left - x, cnt, out);
             }
             cnt[c] = 0;
         }
-        let mut all = Vec::new();
-        bags(0, 4, &mut [0; MAXK], &mut all);
-        let mut lines = Vec::new();
-        for own in 0..6u8 {
-            for cnt in &all {
-                let row = Row { own, cnt: *cnt };
-                lines.push(match Formula::AGen6.action(&row, 6) {
-                    Some(a) => format!("{} {} r{}", row.text(6), a.text(), Formula::AGen6.rule_number(&row, 6).unwrap()),
-                    None => format!("{} undefined", row.text(6)),
-                });
+        let fixtures: [(Formula, &str); 4] = [
+            (Formula::AGen6, include_str!("../testdata/agen6_rows_deg4.txt")),
+            (Formula::ATC3, include_str!("../testdata/atc3_rows_deg4.txt")),
+            (Formula::AC4, include_str!("../testdata/ac4_rows_deg4.txt")),
+            (Formula::AUS5, include_str!("../testdata/aus5_rows_deg4.txt")),
+        ];
+        for (f, text) in fixtures {
+            let (name, k) = f.paper_algorithm().unwrap();
+            let mut all = Vec::new();
+            bags(0, k as usize, 4, &mut [0; MAXK], &mut all);
+            let mut lines = Vec::new();
+            for own in 0..k {
+                for cnt in &all {
+                    let row = Row { own, cnt: *cnt };
+                    lines.push(match f.action(&row, k) {
+                        Some(a) => format!("{} {} r{}", row.text(k), a.text(), f.rule_number(&row, k).unwrap()),
+                        None => format!("{} undefined", row.text(k)),
+                    });
+                }
             }
-        }
-        lines.sort();
-        let fixture: Vec<&str> = include_str!("../testdata/agen6_rows_deg4.txt").lines().collect();
-        assert_eq!(lines.len(), fixture.len());
-        for (mine, theirs) in lines.iter().zip(&fixture) {
-            assert_eq!(mine, theirs);
+            lines.sort();
+            let fixture: Vec<&str> = text.lines().collect();
+            assert_eq!(lines.len(), fixture.len(), "{}: the number of rows", name);
+            for (mine, theirs) in lines.iter().zip(&fixture) {
+                assert_eq!(mine, theirs, "{}", name);
+            }
         }
     }
 

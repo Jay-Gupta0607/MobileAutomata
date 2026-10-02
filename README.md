@@ -37,7 +37,7 @@ a browser will not let a page loaded from disk fetch `game.wasm` ("Failed to fet
 |---|---|---|
 | rebuild `docs/index.html` and `workbench/site/game.wasm` | Rust 1.78 or newer and `rustup target add wasm32-unknown-unknown`; `sh` and `python3` (Git Bash on Windows) | `sh workbench/build.sh` |
 | run the engine, tool and fixture tests | Rust (on Windows also the Visual Studio C++ Build Tools) | `cd workbench/game-wasm` then `cargo test` |
-| run the page and WebAssembly checks | Node 18 or newer | `node testdata/check_page_play.mjs`, `check_page_logic.mjs`, `check_wasm_parity.mjs`, `check_agen6_template.mjs` (from `workbench/game-wasm`) |
+| run the page and WebAssembly checks | Node 18 or newer | `node testdata/check_page_play.mjs`, `check_page_logic.mjs`, `check_wasm_parity.mjs`, `check_paper_templates.mjs` (from `workbench/game-wasm`) |
 | explore a graph from the command line | Rust | `cargo run --bin explore -- --help` (from `workbench/game-wasm`) |
 
 ## Hosting

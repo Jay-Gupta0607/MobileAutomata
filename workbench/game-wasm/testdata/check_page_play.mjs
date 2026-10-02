@@ -242,5 +242,46 @@ await new Promise((res) => setTimeout(res, 0));
 same([buttons(), analysis().includes('Running')], [[true, false], true], 'a search is running: search disabled, cancel enabled');
 P.makeRandomGraph();
 same([buttons(), analysis(), workersStarted > started], [[false, true], '', true], 'a new graph cancels it: buttons back, panel empty, a fresh worker');
+// 11. the algorithms of Hiraoka et al. in the page, chosen as the rule and as the code of the template: the same play, the paper's
+//     letter on the rule numbers of the ledger, the algorithm's own colour names.  The engine's formula and the page's template
+//     are two transcriptions of the paper's rules; every step of the two plays must agree.
+const hiraoka = [
+  ['atc3', 3, '5 0 0-1,1-2,2-3,3-4,0-4', 'D', 'l0'], ['atc3', 3, '7 0 0-1,0-2,1-3,1-4,2-5,2-6', 'D', 'l1'],
+  ['ac4', 4, '5 0 0-1,1-2,2-3,3-4,1-4', 'C', 'front'], ['ac4', 4, '5 0 0-3,0-4,1-3,1-4,2-3,2-4', 'C', 'path'],
+  ['aus5', 5, '4 0 0-1,0-2,0-3,1-2,1-3,2-3', 'U', 'neigh'], ['aus5', 5, '6 0 0-1,0-2,0-3,1-2,1-3,2-3,2-4,4-5', 'U', 'head'],
+];
+for (const [key, k, graph, letter, colourName] of hiraoka) {
+  const plays = {};
+  for (const via of ['rule', 'template']) {
+    const what = `${key} on ${graph} via ${via}`;
+    setup(via === 'rule' ? { k, def: key, graph } : { k, def: 'none', graph, algoSrc: P.ALGO_TEMPLATES[key] });
+    same(P.paperMode(), true, `${what}: the paper model`);
+    P.render(); run(400);
+    const p = P.state.play;
+    same([p.done && p.done.kind, P.playPaperStatus(p).outcome], ['stopped', 'explores'], `${what}: stops on the start with every vertex visited`);
+    check(p.steps.length > 0 && p.steps.every((s) => Number.isInteger(s.rule)), `${what}: every step carries the paper's rule number`);
+    P.render();
+    const ledger = String(element('#ledger tbody').innerHTML), legend = String(element('#legend').innerHTML);
+    check(ledger.includes(`· ${letter}`) && !ledger.includes('· r'), `${what}: the ledger tags the rules ${letter}n`);
+    check(legend.includes(`</span>${colourName}</span>`), `${what}: the legend names the colours (${colourName})`);
+    plays[via] = p.steps.map((s) => [s.cur, s.row, s.paint, s.target, s.next, s.rule]);
+  }
+  same(plays.template, plays.rule, `${key} on ${graph}: the template and the formula play identically`);
+}
+// the panel's sentence uses the right article: A_TC3 starts by painting l0 and moving to an init neighbour
+setup({ k: 3, def: 'atc3', graph: '3 0 0-1,1-2' });
+check(panel().includes('moves to an <b>init</b> neighbour'), 'the panel says "an init neighbour", not "a init neighbour"');
+// more colours than the algorithm needs are unused
+setup({ k: 5, def: 'atc3', graph: '3 0 0-1,1-2' });
+same([P.cname(1), P.cname(2), P.cname(3), P.cname(4)], ['l0', 'l1', 'unused', 'unused'], 'A_TC3 with five colours leaves two unused');
+same(hint(), { text: 'A_TC3 needs 3 colours (the other 2 unused)', warn: false }, 'and the hint says so without a warning');
+setup({ k: 2, def: 'aus5', graph: '3 0 0-1,1-2' });
+same(hint(), { text: 'A_US5 needs 5 colours (now 2)', warn: true }, 'too few colours is a warning');
+// the engine refuses too few colours, and the page shows its message instead of a play
+check(String(P.engine(P.requestText('step', { colours: '0 0 0', cur: 0, vis: '0' })).message).includes('aus5 needs 5 colours'), 'the engine says aus5 needs five colours');
+// a table row still wins over the algorithm, and then carries no rule number
+setup({ k: 3, def: 'atc3', graph: '3 0 0-1,1-2', table: [['0.100', { paint: 1, target: 0 }]] });
+check(P.state.play.pending.source === 'table' && !P.state.play.pending.rule, 'a row of the table wins over A_TC3 and has no rule number');
+
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

@@ -40,21 +40,21 @@ for (const name of names) {
 }
 if (names.length < 20) { console.log(`only ${names.length} fixtures found`); bad++; }
 
-// the page's own presets that bring A_Gen6 must explore in this engine, and have a position for every vertex
+// the page's own presets that bring one of the algorithms of the papers must explore in this engine, and have a position for every vertex
 {
   const page = readFileSync(join(workbench, 'site', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
   const a = page.indexOf('const PRESETS = {'), b = page.indexOf('\n', page.indexOf('PRESETS.agen6sketch1'));
   const PRESETS = new Function(page.slice(a, b) + '\nreturn PRESETS;')();
   let n = 0;
-  for (const [name, pr] of Object.entries(PRESETS).filter(([, p]) => p.def === 'agen6')) {
+  for (const [name, pr] of Object.entries(PRESETS).filter(([, p]) => ['agen6', 'atc3', 'ac4', 'aus5'].includes(p.def))) {
     const nodes = +pr.text.split(/\s+/)[0];
-    const got = JSON.parse(run(`cmd exact\nk ${pr.k}\ngraph ${pr.text}\ndefault agen6\ncap 2000000\n`));
+    const got = JSON.parse(run(`cmd exact\nk ${pr.k}\ngraph ${pr.text}\ndefault ${pr.def}\ncap 2000000\n`));
     const ok = got.status === 'explores' && got.trace.stopped_at === +pr.text.split(/\s+/)[1] && (!pr.coords || pr.coords.length === nodes);
     if (ok) console.log(`ok    preset ${name} explores (${got.positions} positions)`);
     else { bad++; console.log(`FAIL  preset ${name}: ${got.status}, ${pr.coords ? pr.coords.length : 'no'} coordinates for ${nodes} vertices`); }
     n++;
   }
-  if (n < 4) { bad++; console.log(`only ${n} A_Gen6 presets found`); }
+  if (n < 10) { bad++; console.log(`only ${n} presets of the papers' algorithms found`); }
 }
 
 // the colour counts the page's hint states must be the engine's: one colour fewer and the rule has no answer (A_Gen6 is an error)
