@@ -62,8 +62,8 @@ for (const key of ['agen6', 'atc3', 'ac4', 'aus5']) {
   check(rules[0] === null && rules.slice(1).every((t) => typeof t === 'string' && t.length > 10), `${key}: every rule has a description, and index 0 is unused`);
   check(algoOfCode(tpl.slice(open.length)) === key, `${key}: the template is recognised by its first comment line`);
 }
-same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.rules.length - 1])), { agen6: 11, atc3: 11, ac4: 14, aus5: 19 }, "the number of rules of each algorithm is the paper's (D1-D11, C1-C14, U1-U19)");
-same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.colours.length])), { agen6: 6, atc3: 3, ac4: 4, aus5: 5 }, 'and so is the number of colours');
+same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.rules.length - 1])), { agen6: 11, atc3: 11, ac4: 14, aus5: 19, a2c5: 21 }, "the number of rules of each algorithm is the paper's (D1-D11, C1-C14, U1-U19), and T1-T21 for the two-agent A_2x5");
+same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.colours.length])), { agen6: 6, atc3: 3, ac4: 4, aus5: 5, a2c5: 5 }, 'and so is the number of colours');
 same(Object.keys(PAPER_ALGOS).every((key) => COLOUR_NEED[key].exact && COLOUR_NEED[key].n === PAPER_ALGOS[key].colours.length), true, "COLOUR_NEED states each algorithm's colour count");
 same([colourLabel(0, 'agen6'), colourLabel(3, 'agen6'), colourLabel(5, 'agen6')], ['init', 'head1', 'neigh'], 'named colours');
 same([colourLabel(1, 'atc3'), colourLabel(2, 'ac4'), colourLabel(4, 'aus5')], ['l0', 'front', 'head'], 'named colours of the other algorithms');
@@ -91,7 +91,10 @@ same(colourHint('flipsweep4', 4), { text: 'flipsweep4 needs at least 4 colours',
 same(colourHint('flipsweep5', 4), { text: 'flipsweep5 needs at least 5 colours (now 4)', warn: true }, 'a minimum that is not met');
 same([colourHint('flipsweep5', 6).warn, colourHint('chase3', 2).warn, colourHint('eat3', 3).warn], [false, true, false], 'the boundary is k = n');
 same([colourHint('sigma', 2), colourHint('none', 5), colourHint('sweep', 3), colourHint(null, 6), colourHint('chasewhite', 2)], [null, null, null, null, null], 'rules that work with any number have no hint');
-same(Object.keys(COLOUR_NEED).sort(), ['ac4', 'agen6', 'atc3', 'aus5', 'chase3', 'eat3', 'flipsweep4', 'flipsweep4b', 'flipsweep5', 'flipsweep5d'], 'the rules with a stated need');
+same(Object.keys(COLOUR_NEED).sort(), ['a2c5', 'ac4', 'agen6', 'atc3', 'aus5', 'chase3', 'eat3', 'flipsweep4', 'flipsweep4b', 'flipsweep5', 'flipsweep5d'], 'the rules with a stated need');
+// the two-agent A_2x5 has no code template (the code editor is for one agent), so its descriptions and tags are checked here
+check(PAPER_ALGOS.a2c5.rules[0] === null && PAPER_ALGOS.a2c5.rules.slice(1).every((t) => typeof t === 'string' && t.length > 10), 'A_2x5: every rule has a description, and index 0 is unused');
+same([ruleTag('a2c5', 5), ruleTag('a2c5', 21), colourLabel(4, 'a2c5'), colourLabel(2, 'a2c5'), colourHint('a2c5', 5), colourHint('a2c5', 4)], ['T5', 'T21', 'head', 'neigh', { text: 'A_2x5 needs 5 colours', warn: false }, { text: 'A_2x5 needs 5 colours (now 4)', warn: true }], 'A_2x5: rule tags, colour names and the colour hint');
 
 // 2c. the random graph option: every size gives a connected graph the engine accepts, and a layout that can be read
 const seeded = (seed) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; // mulberry32

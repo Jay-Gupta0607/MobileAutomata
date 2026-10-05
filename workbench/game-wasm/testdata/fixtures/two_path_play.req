@@ -1,0 +1,6 @@
+cmd play
+agents 2
+k 5
+graph 3 0 0-1,1-2
+default a2c5
+prefer 1 2 0

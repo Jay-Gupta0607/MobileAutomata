@@ -43,7 +43,7 @@ if (names.length < 20) { console.log(`only ${names.length} fixtures found`); bad
 // the page's own presets that bring one of the algorithms of the papers must explore in this engine, and have a position for every vertex
 {
   const page = readFileSync(join(workbench, 'site', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
-  const a = page.indexOf('const PRESETS = {'), b = page.indexOf('\n', page.indexOf('PRESETS.agen6sketch1'));
+  const a = page.indexOf('const PRESETS = {'), b = page.indexOf('\n', page.indexOf('PRESETS.a2sketch1'));
   const PRESETS = new Function(page.slice(a, b) + '\nreturn PRESETS;')();
   let n = 0;
   for (const [name, pr] of Object.entries(PRESETS).filter(([, p]) => ['agen6', 'atc3', 'ac4', 'aus5'].includes(p.def))) {
@@ -55,6 +55,18 @@ if (names.length < 20) { console.log(`only ${names.length} fixtures found`); bad
     n++;
   }
   if (n < 10) { bad++; console.log(`only ${n} presets of the papers' algorithms found`); }
+  // the presets for two agents: the engine's exact game over every adversary (which agent, which destination) explores each,
+  // and each has a position for every vertex
+  let two = 0;
+  for (const [name, pr] of Object.entries(PRESETS).filter(([, p]) => p.agents === 2)) {
+    const nodes = +pr.text.split(/\s+/)[0];
+    const got = JSON.parse(run(`cmd exact\nagents 2\nk ${pr.k}\ngraph ${pr.text}\ndefault a2c5\ncap 2000000\n`));
+    const ok = pr.def === 'a2c5' && got.status === 'explores' && got.agents === 2 && got.trace.stopped_at === +pr.text.split(/\s+/)[1] && (!pr.coords || pr.coords.length === nodes);
+    if (ok) console.log(`ok    preset ${name} (two agents) explores (${got.positions} positions)`);
+    else { bad++; console.log(`FAIL  preset ${name} (two agents): ${got.status}, ${pr.coords ? pr.coords.length : 'no'} coordinates for ${nodes} vertices`); }
+    two++;
+  }
+  if (two < 4) { bad++; console.log(`only ${two} presets for two agents found`); }
 }
 
 // the colour counts the page's hint states must be the engine's: one colour fewer and the rule has no answer (A_Gen6 is an error)
@@ -63,7 +75,8 @@ if (names.length < 20) { console.log(`only ${names.length} fixtures found`); bad
   const a = page.indexOf('const COLOUR_NEED = {'), b = page.indexOf('};', a) + 2;
   const COLOUR_NEED = new Function(page.slice(a, b) + '\nreturn COLOUR_NEED;')();
   for (const [rule, need] of Object.entries(COLOUR_NEED)) {
-    const at = (k) => JSON.parse(run(`cmd answer\nk ${k}\nrow 0.1\ndefault ${rule}\n`));
+    // the two-agent rule is asked with two agents, on a row of its own shape (own.bag@p)
+    const at = (k) => JSON.parse(run(rule === 'a2c5' ? `cmd answer\nagents 2\nk ${k}\nrow 0.30000@h\ndefault a2c5\n` : `cmd answer\nk ${k}\nrow 0.1\ndefault ${rule}\n`));
     const fewer = at(need.n - 1), enough = at(need.n);
     const ok = (fewer.status === 'error' || fewer.defined === false) && enough.status === 'ok' && enough.defined === true;
     if (ok) console.log(`ok    ${rule} needs ${need.n} colours, as the page says`);

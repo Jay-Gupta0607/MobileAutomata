@@ -28,8 +28,14 @@ rule
                         atc3   trees and simple cycles, 3 colours (Hiraoka et al., arXiv 2609.14356)
                         ac4    blocks that are cycles or complete bipartite (cacti), 4 colours (same paper)
                         aus5   blocks that are cliques or triangle-free, 5 colours (same paper)
+                      and, with --agents 2 only (the default there):
+                        a2c5   any graph, TWO agents, 5 colours (see \"Two agents\" in workbench/README.md)
   --table FILE        rows `own.bag paint>target`, one per line; # starts a comment; target is a
                       colour, stay or stop.  Rows in the table win over --rule
+  --agents N          1 (default) or 2.  Two agents see each other and run the built-in rule a2c5 (5 colours, the
+                      paper model); tables, --model classic and the walks command are for one agent.  In the
+                      answer for two agents a row reads own.bag@p: p is h (the other agent is on this vertex),
+                      the colour digit of the neighbour holding it, or - (not next door); e.g. 4.20100@h
   --k N               number of colours, 2 to 6 (default 5; the algorithms of the papers set their own
                       number, which is also the least they accept)
   --model MODEL       classic or paper (default: paper when the rule can stop, else classic)
@@ -39,7 +45,7 @@ search
   --walks N           walks only: random walks after the three deterministic ones, 0 to 100000 (default 64)
   --budget N          walks and play only: most steps, 10 to 5000000 (default 200000)
   --prefer LIST       play only: adversary preference order, e.g. \"1 2 3 0\" (a vertex not listed comes last)
-  --row own.bag       answer only: the row to look up, e.g. 3.100100
+  --row own.bag       answer only: the row to look up, e.g. 3.100100 (two agents: own.bag@p, e.g. 4.11001@h)
 
 An option that does not belong to the command is an error, and so is a value outside its range
 (the engine would otherwise adjust it without saying so).
@@ -99,13 +105,14 @@ struct Args {
     budget: Option<String>,
     prefer: Option<String>,
     row: Option<String>,
+    agents: Option<String>,
     summary: bool,
     request: bool,
     request_file: Option<String>,
 }
 
 fn parse_args(argv: &[String]) -> Result<Args, String> {
-    let mut a = Args { command: String::new(), graph: None, rule: None, table: None, k: None, model: None, cap: None, walks: None, budget: None, prefer: None, row: None, summary: false, request: false, request_file: None };
+    let mut a = Args { command: String::new(), graph: None, rule: None, table: None, k: None, model: None, cap: None, walks: None, budget: None, prefer: None, row: None, agents: None, summary: false, request: false, request_file: None };
     let mut i = 0;
     while i < argv.len() {
         let arg = argv[i].as_str();
@@ -135,6 +142,7 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
             "--budget" => a.budget = Some(value(arg)?),
             "--prefer" => a.prefer = Some(value(arg)?),
             "--row" => a.row = Some(value(arg)?),
+            "--agents" => a.agents = Some(value(arg)?),
             "--summary" => a.summary = true,
             "--request" => a.request = true,
             "--request-file" => a.request_file = Some(value(arg)?),
@@ -147,7 +155,7 @@ fn parse_args(argv: &[String]) -> Result<Args, String> {
     }
     if a.request_file.is_some() {
         // the file is sent as written, so an option that would change the request would be ignored without a word
-        let others = a.graph.is_some() || a.rule.is_some() || a.table.is_some() || a.k.is_some() || a.model.is_some() || a.cap.is_some() || a.walks.is_some() || a.budget.is_some() || a.prefer.is_some() || a.row.is_some();
+        let others = a.graph.is_some() || a.rule.is_some() || a.table.is_some() || a.k.is_some() || a.model.is_some() || a.cap.is_some() || a.walks.is_some() || a.budget.is_some() || a.prefer.is_some() || a.row.is_some() || a.agents.is_some();
         return if a.command.is_empty() && !others { Ok(a) } else { Err("--request-file is used alone: the file holds the whole request (only --summary and --request go with it)".into()) };
     }
     match a.command.as_str() {
@@ -196,7 +204,32 @@ fn build_request(a: &Args) -> Result<String, String> {
     if a.command == "answer" && a.graph.is_some() {
         return Err("`answer` looks up one row and takes no graph".into());
     }
+    let agents: u8 = match &a.agents {
+        Some(v) => number("--agents", v, 1, 2)?.parse().unwrap(),
+        None => 1,
+    };
+    if agents == 2 {
+        if a.table.is_some() {
+            return Err("--table is for one agent: two agents run the built-in rule a2c5".into());
+        }
+        if a.command == "walks" {
+            return Err("`walks` is for one agent: with two agents use `exact` or `play`".into());
+        }
+        if let Some(rule) = &a.rule {
+            if rule != "a2c5" {
+                return Err(format!("two agents run the rule a2c5, not {}", rule));
+            }
+        }
+    } else if a.rule.as_deref() == Some("a2c5") {
+        return Err("a2c5 is a two-agent rule: add --agents 2".into());
+    }
     let mut r = format!("cmd {}\n", a.command);
+    if agents == 2 {
+        r += "agents 2\ndefault a2c5\n";
+        if a.k.is_none() {
+            r += "k 5\n";
+        }
+    }
     if let Some(k) = &a.k {
         r += &format!("k {}\n", number("--k", k, 2, 6)?);
     } else if let Some((_, k)) = a.rule.as_deref().and_then(game_wasm::Formula::parse).and_then(|f| f.paper_algorithm()) {
@@ -206,7 +239,7 @@ fn build_request(a: &Args) -> Result<String, String> {
         let g = a.graph.as_deref().ok_or("--graph (or --graph-file, --preset) is required")?;
         r += &format!("graph {}\n", g);
     }
-    if let Some(rule) = &a.rule {
+    if let (Some(rule), 1) = (&a.rule, agents) {
         one_line("--rule", rule)?;
         r += &format!("default {}\n", rule);
     }
@@ -278,7 +311,7 @@ fn summary(json: &str) -> String {
     }
     let mut s = status.to_string();
     if let Some(m) = json_str(json, "model") {
-        s += &format!(" ({} model)", m);
+        s += &format!(" ({} model{})", m, if json_raw(json, "agents") == Some("2") { ", 2 agents" } else { "" });
     }
     if let Some(reason) = json_str(json, "reason") {
         s += &format!(", {}", reason.replace('_', " "));

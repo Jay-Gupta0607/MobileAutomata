@@ -1326,10 +1326,17 @@ struct Request {
     model: String,
     prefer: Vec<u8>,
     bad_prefer: Vec<String>,
+    /// `agents 1` (default) or `agents 2`; anything else is an error
+    agents: Option<u8>,
+    /// the name after `default`, as written (two agents have one built-in rule that is not a `Formula`)
+    default_raw: String,
+    /// two agents: the second agent's vertex, and one stopped flag per agent
+    cur2: Option<u8>,
+    term: Vec<u8>,
 }
 
 fn parse_request(input: &str) -> Request {
-    let mut r = Request { cmd: String::new(), k: 5, graph: None, table: Map::default(), bad_rows: Vec::new(), default: None, bad_default: None, cap: 1_000_000, walks: 64, budget: 200_000, colours: Vec::new(), cur: None, vis: Vec::new(), row: None, model: String::new(), prefer: Vec::new(), bad_prefer: Vec::new() };
+    let mut r = Request { cmd: String::new(), k: 5, graph: None, table: Map::default(), bad_rows: Vec::new(), default: None, bad_default: None, cap: 1_000_000, walks: 64, budget: 200_000, colours: Vec::new(), cur: None, vis: Vec::new(), row: None, model: String::new(), prefer: Vec::new(), bad_prefer: Vec::new(), agents: Some(1), default_raw: String::new(), cur2: None, term: Vec::new() };
     let mut in_table = false;
     for line in input.lines() {
         let line = line.trim();
@@ -1360,7 +1367,11 @@ fn parse_request(input: &str) -> Request {
             "cmd" => r.cmd = val.to_string(),
             "k" => r.k = val.parse().unwrap_or(5),
             "graph" => r.graph = Some(Graph::parse(val)),
+            "agents" => r.agents = val.parse::<u8>().ok().filter(|&a| a == 1 || a == 2),
+            "cur2" => r.cur2 = val.parse().ok(),
+            "term" => r.term = val.split_whitespace().filter_map(|x| x.parse().ok()).collect(),
             "default" => {
+                r.default_raw = val.to_string();
                 if val.is_empty() || val == "none" {
                     r.default = None;
                 } else {
@@ -1412,6 +1423,11 @@ pub fn handle(input: &str) -> String {
     let r = parse_request(input);
     if !(2..=MAXK as u8).contains(&r.k) {
         return err(&format!("k must be between 2 and {}", MAXK));
+    }
+    match r.agents {
+        None => return err("agents must be 1 or 2"),
+        Some(2) => return two::handle(&r),
+        _ => {}
     }
     if let Some(bad) = &r.bad_default {
         return err(&format!("unknown default rule {}", bad));
@@ -1533,6 +1549,7 @@ pub unsafe extern "C" fn free_result(ptr: *mut u8) {
 
 #[cfg(test)]
 mod paper_tests;
+mod two;
 
 #[cfg(test)]
 mod tests {

@@ -346,3 +346,54 @@ fn the_algorithms_of_the_second_paper_bring_their_colours_and_explore_their_clas
         assert!(help.contains(name), "--help does not mention {}", name);
     }
 }
+
+const DIAMOND: &str = "4 2 0-1,0-2,0-3,1-2,1-3";
+
+#[test]
+fn two_agents_explore_the_diamond_that_a_us5_alone_fails() {
+    // the diamond (K4 minus an edge) is outside A_US5's class: one agent fails from this start, two agents explore it
+    let one = run(&["exact", "--graph", DIAMOND, "--rule", "aus5", "--summary"]);
+    assert_eq!(code(&one), 1, "{}", stdout(&one));
+    let two = run(&["exact", "--graph", DIAMOND, "--agents", "2", "--summary"]);
+    assert_eq!(code(&two), 0, "{}", stdout(&two));
+    assert_eq!(stdout(&two).trim(), "explores (paper model, 2 agents), 78 positions, stopped on vertex 2");
+    // naming the rule is optional, and a2c5 with two agents sets its own colours and request lines
+    let req = stdout(&run(&["exact", "--graph", DIAMOND, "--agents", "2", "--request"]));
+    for line in ["agents 2", "default a2c5", "k 5"] {
+        assert!(req.lines().any(|l| l == line), "{}: {}", line, req);
+    }
+}
+
+#[test]
+fn two_agents_play_and_answer() {
+    let o = run(&["play", "--graph", "3 0 0-1,1-2", "--agents", "2", "--prefer", "1 2 0"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let json = stdout(&o);
+    assert!(json.contains("\"agents\":2") && json.contains("\"stopped_at\":0"), "{}", json);
+    assert_eq!(json.matches("{\"agent\":").count(), 17, "the hand trace of the path has 17 steps");
+    // the answer for one observation: both agents on a head with a candidate waiting and no mark left: rule 4, paint 1, target 4
+    let a = run(&["answer", "--agents", "2", "--row", "4.11001@h"]);
+    assert_eq!(code(&a), 0);
+    assert!(stdout(&a).contains("\"paint\":1,\"target\":4,\"rule\":4"), "{}", stdout(&a));
+}
+
+#[test]
+fn two_agents_refuse_what_is_for_one_agent() {
+    for (args, text) in [
+        (vec!["exact", "--graph", PATH4, "--agents", "2", "--rule", "aus5"], "two agents run the rule a2c5, not aus5"),
+        (vec!["walks", "--graph", PATH4, "--agents", "2"], "`walks` is for one agent"),
+        (vec!["exact", "--graph", PATH4, "--rule", "a2c5"], "a2c5 is a two-agent rule: add --agents 2"),
+        (vec!["exact", "--graph", PATH4, "--agents", "3"], "--agents must be between 1 and 2"),
+        (vec!["exact", "--graph", PATH4, "--agents", "2", "--k", "4", "--summary"], "error: a2c5 needs 5 colours"),
+    ] {
+        let o = run(&args);
+        assert_eq!(code(&o), 64, "{:?}: {}", args, stdout(&o));
+        assert!(stderr(&o).contains(text) || stdout(&o).contains(text), "{:?}: {} {}", args, stderr(&o), stdout(&o));
+    }
+    let t = Temp::new("two-agents-table.txt", "0.1 1>0\n");
+    let o = run(&["exact", "--graph", PATH4, "--agents", "2", "--table", t.path()]);
+    assert_eq!(code(&o), 64);
+    assert!(stderr(&o).contains("--table is for one agent"), "{}", stderr(&o));
+    let help = stdout(&run(&["--help"]));
+    assert!(help.contains("a2c5") && help.contains("--agents"), "--help does not mention the two-agent rule");
+}

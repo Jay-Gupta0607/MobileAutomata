@@ -1,0 +1,10 @@
+cmd step
+agents 2
+k 5
+graph 3 0 0-1,1-2
+default a2c5
+colours 1 4 0
+cur 2
+cur2 1
+term 0 0
+vis 0 1 2

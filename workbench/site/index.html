@@ -88,7 +88,8 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
     <button type="button" data-mode="start" aria-pressed="false" title="Click a vertex to make it the start (S)">Set start</button>
   </div>
   <div class="group"><label for="k">colours</label><select id="k"><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option></select><span id="khint" class="khint" role="status"></span></div>
-  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I (17)</option><option value="sketch2">Sketch II (14)</option><option value="paw">paw + pendant (k=2 killer)</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path (hand trace 1)</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle (hand trace 2)</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree (hand trace 3)</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="atc3cycle" title="Selects the rule A_TC3 and three colours">A_TC3 · 5-cycle</option><option value="atc3tree" title="Selects the rule A_TC3 and three colours">A_TC3 · binary tree</option><option value="ac4fig2a" title="Selects the rule A_C4 and four colours">A_C4 · bridge + 4-cycle (Fig. 2a)</option><option value="ac4fig2b" title="Selects the rule A_C4 and four colours">A_C4 · K3,2 (Fig. 2b)</option><option value="aus5k4" title="Selects the rule A_US5 and five colours">A_US5 · K4</option><option value="aus5k4tail" title="Selects the rule A_US5 and five colours">A_US5 · K4 with a tail</option><option value="clear">empty canvas</option></select></div>
+  <div class="group"><label for="agents">agents</label><select id="agents" title="One agent, or two that see each other and run the built-in rule A_2x5 (five colours)"><option value="1" selected>1</option><option value="2">2</option></select><span id="ahint" class="khint" role="status"></span></div>
+  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I</option><option value="sketch2">Sketch II</option><option value="paw">paw + pendant</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="atc3cycle" title="Selects the rule A_TC3 and three colours">A_TC3 · 5-cycle</option><option value="atc3tree" title="Selects the rule A_TC3 and three colours">A_TC3 · binary tree</option><option value="ac4fig2a" title="Selects the rule A_C4 and four colours">A_C4 · bridge + 4-cycle</option><option value="ac4fig2b" title="Selects the rule A_C4 and four colours">A_C4 · K3,2</option><option value="aus5k4" title="Selects the rule A_US5 and five colours">A_US5 · K4</option><option value="aus5k4tail" title="Selects the rule A_US5 and five colours">A_US5 · K4 with a tail</option><option value="a2path" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · path</option><option value="a2diamond" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · diamond</option><option value="a2k4" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · K4</option><option value="a2sketch1" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · Sketch I</option><option value="clear">empty canvas</option></select></div>
   <div class="group" style="flex-wrap:wrap"><label for="rn">random graph</label><input type="number" id="rn" value="10" min="2" max="32" step="1" style="width:64px" title="How many vertices: 2 to 32"><select id="rfam" aria-label="family of graph" style="max-width:200px" title="Which family of graph to generate. In brackets: the first algorithm of the papers that is guaranteed to explore it; the algorithms with more colours (A_TC3, A_C4, A_US5, A_Gen6) are guaranteed too."><option value="any" selected>any connected graph (A_Gen6)</option><option value="ktf">clique / triangle-free blocks (A_US5)</option><option value="cb">cycle / K(p,q) blocks (A_C4)</option><option value="cactus">cactus (A_C4)</option><option value="tree">tree (A_TC3)</option><option value="cycle">simple cycle (A_TC3)</option></select><button type="button" id="b-random" title="Replace the canvas with a new random graph of this family and size">Generate</button></div>
   <div class="group"><button type="button" id="b-import-graph">Import / export graph</button></div>
   <div class="group small" id="wasm-status">loading engine…</div>
@@ -121,6 +122,20 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
     </section>
 
     <section class="panel" id="panel-rules">
+      <div id="rules-two" hidden>
+        <h2>Two agents: A_2x5</h2>
+        <p class="note">With two agents the rule is built in: <b>A_2x5</b>, five colours (init, path, neigh, fin, head). Tables and code are for one agent; switch “agents” back to 1 to use them (they are kept).</p>
+        <h2>The model</h2>
+        <ul class="note">
+          <li>Both agents start on the start vertex, every vertex white (init). They are identical and oblivious.</li>
+          <li>Each sees its own vertex colour, whether the other agent is on that vertex, and for every neighbour its colour and whether the other agent is there. It may ask to move to a neighbour of a colour, to the neighbour that holds the other agent, to stay, to stop, or to wait.</li>
+          <li>The scheduler activates one agent at a time and is fair; the adversary also chooses the destination among equal candidates. (If the adversary could activate both at once, identical agents would be no better than one: the adversary can always send them to the same place.)</li>
+          <li>The agents explore when every vertex is visited and both have stopped on the start vertex.</li>
+        </ul>
+        <h2>The 21 rules</h2>
+        <table id="two-rules"><thead><tr><th>rule</th><th>what it does</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div id="rules-one">
       <h2>Algorithm</h2>
       <p class="note">Write the rule as code: a function body receiving the row and returning the action. It is compiled into a table for every row up to the graph’s largest degree, so the engine and the exact game use exactly what you wrote. Rows in the table below still win over it.</p>
       <div class="row"><label class="small" for="algo-preset">template</label><select id="algo-preset"><option value="">choose…</option><option value="sigma">σ* (readable form)</option><option value="sweep">sweep(c,t,p) with parameters</option><option value="flipsweep4">flipsweep4</option><option value="flipsweep4b">flipsweep4b</option><option value="flipsweep5">flipsweep5</option><option value="flipsweep5d">flipsweep5d</option><option value="eat3">eat3</option><option value="chase3">chase3</option><option value="chase">chase white, else stay</option><option value="agen6">A_Gen6 (paper, needs 6 colours)</option><option value="atc3">A_TC3 (trees and cycles, 3 colours)</option><option value="ac4">A_C4 (cycle and bipartite blocks, 4 colours)</option><option value="aus5">A_US5 (clique or triangle-free blocks, 5 colours)</option><option value="blank">blank with the API</option></select><button type="button" id="b-algo-compile" class="primary">Compile and use</button><button type="button" id="b-algo-off">Stop using</button><button type="button" id="b-algo-table" title="Copy the compiled rows into the table below, where each row can be changed">To table</button></div>
@@ -157,6 +172,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
       <p class="note">One <span class="mono">row paint&gt;target</span> per line, the engine’s <span class="mono">rule_final.txt</span> format; lines starting with <span class="mono">#</span> are ignored.</p>
       <textarea id="tabletext" spellcheck="false"></textarea>
       <div class="row"><button type="button" id="b-table-import">Replace table with text</button><button type="button" id="b-table-export">Text from table</button><button type="button" id="b-table-clear">Clear table</button></div>
+      </div>
     </section>
 
     <section class="panel" id="panel-analysis">
@@ -164,7 +180,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
       <p class="note">The exact game enumerates every position the adversary can reach under the rule. “Explores” means no adversarial execution leaves a vertex unvisited; “fails” comes with one trapping execution you can replay.</p>
       <div class="row"><label class="small" for="cap">position cap</label><input type="number" id="cap" value="1000000" min="1000" max="12000000" step="100000" style="width:120px"><button type="button" id="b-exact" class="primary">Search all executions</button><button type="button" id="b-cancel" disabled>Cancel</button></div>
       <h2>Quick adversary walks</h2>
-      <div class="row"><label class="small" for="walks">random walks</label><input type="number" id="walks" value="64" min="0" max="100000" style="width:90px"><button type="button" id="b-walks">Run walks</button></div>
+      <div class="row"><label class="small" for="walks">random walks</label><input type="number" id="walks" value="64" min="0" max="100000" style="width:90px"><button type="button" id="b-walks">Run walks</button><span id="walks-two" class="note" hidden>not offered for two agents: use the exact search</span></div>
       <div id="analysis"></div>
     </section>
   </aside>
@@ -254,13 +270,40 @@ const AUS5_RULES = [null,
   'predecessor next to the head, no marks: become head and go back to it',
   'a mark next to the path: become init and go to the path vertex',
   'a mark: become init and go back to the head'];
+// A_2x5: the two-agent algorithm of this workbench (not from a paper): the semi-DFS of A_US5 with the five colours of A_US5, run by
+// two agents that see each other; the second agent marks the head, which lets a rejected neighbour find its way back when two
+// vertices carry the head colour.  Rules T1-T21.  The agent that acts is named in the ledger: A works, B waits and follows.
+const A2C5_COLOURS = ['init', 'path', 'neigh', 'fin', 'head'];
+const A2C5_RULES = [null,
+  'no neighbour at all: become fin and stop',
+  'the start, both agents together: become path and enter an init neighbour',
+  'together on the head with a candidate waiting and a mark left: go and restore the mark',
+  'together on the head with a candidate waiting and no mark left: become path and move to the candidate',
+  'together on the head: probe an init neighbour',
+  'together on the head, nothing left to probe and no candidate: become fin (this flags the backtrack)',
+  'together on the start as the head: become path and enter an init neighbour',
+  'together on the start with nothing left: become fin and stop',
+  'together on a finished head: go and restore a mark',
+  'together on a finished head, marks restored: back up to the predecessor on the path',
+  'together on the finished start: stop',
+  'a probed vertex touches the path (a chord): mark it neigh and go back to the partner',
+  'a probed vertex touches no other path vertex: become the candidate (head) and go back to the partner',
+  'entered from the start vertex: become the head',
+  'a mark: become init and go back to the partner',
+  'on the head while the partner is away: wait',
+  'the partner is the new head: follow it',
+  'the predecessor, reached while backtracking: become the head',
+  'wait for the partner',
+  'the partner is the head: follow it',
+  'wait for the partner'];
 // By key (the name used in requests, `default NAME`): the colour names, the rule descriptions and the letter the paper puts
-// before a rule number (none for A_Gen6).
+// before a rule number (none for A_Gen6; T for the two-agent A_2x5).
 const PAPER_ALGOS = {
   agen6: { colours: AGEN6_COLOURS, rules: AGEN6_RULES, prefix: '' },
   atc3: { colours: ATC3_COLOURS, rules: ATC3_RULES, prefix: 'D' },
   ac4: { colours: AC4_COLOURS, rules: AC4_RULES, prefix: 'C' },
   aus5: { colours: AUS5_COLOURS, rules: AUS5_RULES, prefix: 'U' },
+  a2c5: { colours: A2C5_COLOURS, rules: A2C5_RULES, prefix: 'T' }, // two agents
 };
 function paperAlgo(key) { return Object.prototype.hasOwnProperty.call(PAPER_ALGOS, key) ? PAPER_ALGOS[key] : null; }
 // The label of colour c: its name when the algorithm in use names its colours (a colour beyond its list is unused), else
@@ -294,6 +337,7 @@ function paperStatus(v) {
 // papers exactly their number (more colours are left unused), some built-in rules at least so many; the other rules
 // work with any number and are not listed.
 const COLOUR_NEED = {
+  a2c5: { n: 5, exact: true, name: 'A_2x5' },
   agen6: { n: 6, exact: true, name: 'A_Gen6' },
   atc3: { n: 3, exact: true, name: 'A_TC3' }, ac4: { n: 4, exact: true, name: 'A_C4' }, aus5: { n: 5, exact: true, name: 'A_US5' },
   flipsweep4: { n: 4, name: 'flipsweep4' }, flipsweep4b: { n: 4, name: 'flipsweep4b' },
@@ -537,6 +581,7 @@ function runInWorker(text) { return new Promise(async (res) => { await workerRea
 // ------------------------------------------------------------ state
 const state = {
   k: 5, nodes: [], edges: [], start: 0, mode: 'node', edgeFrom: null, drag: null,
+  agents: 1, back: null, // agents: 1 or 2; back: the one-agent colours, rule and code, kept while two agents are chosen
   table: new Map(), // rowText -> {paint, target}
   def: 'none', sweep: [0, 4, 0],
   algo: null, // {src, table: Map, maxDeg, errors}
@@ -566,6 +611,12 @@ const PRESETS = {
   aus5k4tail: { text: '6 0 0-1,0-2,0-3,1-2,1-3,2-3,2-4,4-5', k: 5, def: 'aus5', coords: [[150,170],[450,170],[450,470],[150,470],[650,320],[850,320]], box: [1000, 640] },
 };
 PRESETS.agen6sketch1 = { ...PRESETS.sketch1, k: 6, def: 'agen6' };
+// A_2x5, two agents: the hand-trace path (17 steps), the diamond (K4 minus an edge, from a vertex of degree 2: the smallest graph outside A_US5's
+// class, which fails on it with one agent), K4 and Sketch I.  Each brings two agents and five colours.
+PRESETS.a2path = { text: '3 0 0-1,1-2', k: 5, def: 'a2c5', agents: 2, coords: [[200,320],[500,320],[800,320]], box: [1000, 640] };
+PRESETS.a2diamond = { text: '4 2 0-1,0-2,0-3,1-2,1-3', k: 5, def: 'a2c5', agents: 2, coords: [[500,170],[500,470],[200,320],[800,320]], box: [1000, 640] };
+PRESETS.a2k4 = { text: '4 0 0-1,0-2,0-3,1-2,1-3,2-3', k: 5, def: 'a2c5', agents: 2, coords: [[300,170],[700,170],[700,470],[300,470]], box: [1000, 640] };
+PRESETS.a2sketch1 = { ...PRESETS.sketch1, k: 5, def: 'a2c5', agents: 2 };
 
 function graphText() { return `${state.nodes.length} ${state.start} ${state.edges.map(([u, v]) => u + '-' + v).join(',')}`; }
 function adjOf(v) { const out = []; for (const [a, b] of state.edges) { if (a === v) out.push(b); else if (b === v) out.push(a); } return out; }
@@ -878,52 +929,84 @@ function usesStop() {
 }
 function defaultName() { return state.def === 'sweep' ? `sweep:${state.sweep.join(',')}` : state.def; }
 function requestText(cmd, extra) {
+  if (state.agents === 2) { // two agents: the built-in rule A_2x5, no table, always the paper model
+    let s = `cmd ${cmd}\nagents 2\nk ${state.k}\ngraph ${graphText()}\ndefault a2c5\n`;
+    for (const [key, val] of Object.entries(extra || {})) s += `${key} ${val}\n`;
+    return s;
+  }
   let s = `cmd ${cmd}\nk ${state.k}\ngraph ${graphText()}\ndefault ${defaultName()}\n`;
   for (const [key, val] of Object.entries(extra || {})) s += `${key} ${val}\n`;
   if (usesStop()) s += 'model paper\n'; // a rule that can stop is judged by the paper's model (default agen6 implies it in the engine)
   s += 'table\n' + tableText() + '\nend\n';
   return s;
 }
+// Two agents: a row reads own.bag@p, where p says where the other agent is: h on this vertex, a colour digit for the neighbour holding
+// it, - not next door.  The chips show the own colour and the neighbours (the partner's vertex included), then the partner.
 function bagChips(rowText) {
-  const [own, bag] = rowText.split('.'); let s = `<span class="chips" title="own colour"><i style="background:${PAL[+own]}"></i></span> · <span class="chips" title="neighbours">`;
+  const [main, partner] = rowText.split('@');
+  const [own, bag] = main.split('.'); let s = `<span class="chips" title="own colour"><i style="background:${PAL[+own]}"></i></span> · <span class="chips" title="neighbours">`;
   for (let c = 0; c < bag.length; c++) for (let j = 0; j < parseInt(bag[c], 16); j++) s += `<i style="background:${PAL[c]}"></i>`;
-  return s + '</span>';
+  s += '</span>';
+  if (partner !== undefined) s += partner === 'h' ? ' · <span class="small" title="the other agent is on this vertex">partner here</span>' : partner === '-' ? ' · <span class="small" title="the other agent is not on a neighbour">partner away</span>' : ` · <span class="chips" title="the other agent is on a neighbour of this colour"><i style="background:${PAL[+partner]}"></i></span><span class="small"> partner</span>`;
+  return s;
 }
 
 // ------------------------------------------------------------ persistence (per-browser convenience only)
-function save() { state.tableStops = undefined; try { localStorage.setItem('cew.state', JSON.stringify({ k: state.k, nodes: state.nodes, edges: state.edges, start: state.start, table: [...state.table.entries()], def: state.def, sweep: state.sweep, algoSrc: state.algoSrc })); } catch (e) { /* storage unavailable */ } }
+function save() { state.tableStops = undefined; try { localStorage.setItem('cew.state', JSON.stringify({ k: state.k, nodes: state.nodes, edges: state.edges, start: state.start, table: [...state.table.entries()], def: state.def, sweep: state.sweep, algoSrc: state.algoSrc, agents: state.agents, back: state.back })); } catch (e) { /* storage unavailable */ } }
 function restore() {
-  try { const s = JSON.parse(localStorage.getItem('cew.state') || 'null'); if (!s || !s.nodes || !s.nodes.length) return false; state.k = s.k || 5; state.nodes = s.nodes; state.edges = s.edges || []; state.start = s.start || 0; state.table = new Map(s.table || []); state.def = s.def || 'none'; state.sweep = s.sweep || [0, 4, 0]; state.algoSrc = s.algoSrc || ''; return true; } catch (e) { return false; }
+  try { const s = JSON.parse(localStorage.getItem('cew.state') || 'null'); if (!s || !s.nodes || !s.nodes.length) return false; state.k = s.k || 5; state.nodes = s.nodes; state.edges = s.edges || []; state.start = s.start || 0; state.table = new Map(s.table || []); state.def = s.def || 'none'; state.sweep = s.sweep || [0, 4, 0]; state.algoSrc = s.algoSrc || ''; state.agents = s.agents === 2 ? 2 : 1; state.back = s.back || null; if (state.agents === 2) { state.def = 'a2c5'; state.algoSrc = ''; } return true; } catch (e) { return false; }
 }
 
 // ------------------------------------------------------------ play
 function resetPlay() {
   stopPlay();
   const n = state.nodes.length;
-  state.play = n ? { colours: new Array(n).fill(0), cur: state.start, vis: new Set([state.start]), steps: [], seen: new Map(), pending: null, done: null, lastEdge: null, history: [] } : null;
+  // cur: the agent, or agent A when there are two; cur2: agent B; term: whether A and B have stopped (two agents)
+  state.play = n ? { colours: new Array(n).fill(0), cur: state.start, cur2: state.start, term: [false, false], vis: new Set([state.start]), steps: [], seen: new Map(), pending: null, done: null, lastEdge: null, history: [] } : null;
   state.replay = null; state.defining = null;
   if (state.play) computePending();
 }
-function posKey(p) { return p.colours.join(',') + '|' + p.cur + '|' + [...p.vis].sort((a, b) => a - b).join(','); }
+function posKey(p) { return p.colours.join(',') + '|' + p.cur + '|' + [...p.vis].sort((a, b) => a - b).join(',') + (state.agents === 2 ? '|' + p.cur2 + '|' + (p.term[0] ? 1 : 0) + (p.term[1] ? 1 : 0) : ''); }
 // The paper model (a rule that can stop, or one of the algorithms of the papers): exploring also needs the agent to return
 // to the start and stop, so reaching the last vertex does not end the play; the classic game ends there.
 function paperMode() { return paperAlgo(state.def) !== null || usesStop(); }
 function computePending() {
   const p = state.play; p.pending = null;
+  const two = state.agents === 2, unvisited = () => [...Array(state.nodes.length).keys()].filter((v) => !p.vis.has(v));
   if (!paperMode() && p.vis.size === state.nodes.length) { p.done = { kind: 'explored' }; return; }
+  if (two && p.term[0] && p.term[1]) { p.done = { kind: 'stopped', unvisited: unvisited() }; return; } // both agents have stopped
   const key = posKey(p);
-  if (p.seen.has(key)) { p.done = { kind: 'confined', repeatAt: p.seen.get(key), unvisited: [...Array(state.nodes.length).keys()].filter((v) => !p.vis.has(v)) }; return; }
+  if (p.seen.has(key)) { p.done = { kind: 'confined', repeatAt: p.seen.get(key), unvisited: unvisited() }; return; }
   p.seen.set(key, p.steps.length);
   if (!engine) return;
-  const r = engine(requestText('step', { colours: p.colours.join(' '), cur: p.cur, vis: [...p.vis].join(' ') }));
+  const r = engine(requestText('step', two ? { colours: p.colours.join(' '), cur: p.cur, cur2: p.cur2, term: p.term.map((t) => (t ? 1 : 0)).join(' '), vis: [...p.vis].join(' ') } : { colours: p.colours.join(' '), cur: p.cur, vis: [...p.vis].join(' ') }));
   if (r.status !== 'ok') { p.done = { kind: 'error', message: r.message }; return; }
+  if (two) { // the engine names the agent that acts (agent 0 = A when both could), or says that neither can
+    if (r.stuck) { p.done = { kind: 'stuck', unvisited: unvisited() }; return; }
+    if (!r.defined) { p.done = { kind: 'error', message: `A_2x5 has no rule for the row ${r.row}` }; return; }
+    p.pending = { agent: r.agent, row: r.row, paint: r.paint, target: r.target, options: r.options, auto: r.auto, source: 'built-in', rule: Number.isInteger(r.rule) ? r.rule : null };
+    return;
+  }
   if (!r.defined) { p.pending = null; state.defining = { row: r.row, degree: r.degree }; return; }
   const source = state.table.has(r.row) ? 'table' : state.algo && state.algo.table.has(r.row) ? 'algorithm' : r.source;
   const entry = source === 'table' ? state.table.get(r.row) : source === 'algorithm' ? state.algo.table.get(r.row) : null;
   const rule = Number.isInteger(r.rule) ? r.rule : entry && Number.isInteger(entry.rule) ? entry.rule : null; // the paper's rule number, for rules that have them
   p.pending = { row: r.row, paint: r.paint, target: r.target, options: r.options, auto: r.auto, source, rule };
 }
+// Two agents: the agent that the engine named acts; it paints the vertex it stands on and moves, stays or stops.
+function applyChoice2(choice) {
+  const p = state.play, pd = p.pending; if (!pd) return;
+  const ag = pd.agent, pos = ag === 0 ? p.cur : p.cur2, other = ag === 0 ? p.cur2 : p.cur;
+  p.history.push({ colours: p.colours.slice(), cur: p.cur, cur2: p.cur2, term: p.term.slice(), vis: new Set(p.vis), steps: p.steps.length, seen: p.seen.size, lastEdge: p.lastEdge });
+  p.steps.push({ agent: ag, cur: pos, other, row: pd.row, paint: pd.paint, target: pd.target, options: pd.options, next: choice, source: pd.source, rule: pd.rule });
+  p.colours[pos] = pd.paint;
+  if (choice !== null) { p.lastEdge = [pos, choice]; if (ag === 0) p.cur = choice; else p.cur2 = choice; p.vis.add(choice); } else p.lastEdge = null;
+  state.defining = null;
+  if (pd.target === -2) p.term[ag] = true; // this agent has stopped; the play ends when both have
+  computePending();
+}
 function applyChoice(choice) {
+  if (state.agents === 2) { applyChoice2(choice); return; }
   const p = state.play, pd = p.pending; if (!pd) return;
   p.history.push({ colours: p.colours.slice(), cur: p.cur, vis: new Set(p.vis), steps: p.steps.length, seen: p.seen.size, lastEdge: p.lastEdge });
   p.steps.push({ cur: p.cur, row: pd.row, paint: pd.paint, target: pd.target, options: pd.options, next: choice, source: pd.source, rule: pd.rule });
@@ -940,6 +1023,7 @@ function applyChoice(choice) {
 function undo() {
   const p = state.play; const h = p.history.pop(); if (!h) return;
   p.colours = h.colours; p.cur = h.cur; p.vis = h.vis; p.steps.length = h.steps; p.lastEdge = h.lastEdge; p.done = null;
+  if (h.term) { p.cur2 = h.cur2; p.term = h.term; } // two agents
   const keys = [...p.seen.keys()]; for (let i = keys.length - 1; i >= h.seen - 1 && i >= 0; i--) p.seen.delete(keys[i]);
   state.defining = null; computePending();
 }
@@ -1003,7 +1087,23 @@ function renderColourHint() {
   const h = colourHint(rule, state.k), el = $('#khint');
   el.textContent = h ? h.text : ''; el.className = 'khint' + (h && h.warn ? ' warn' : '');
 }
-function render() { renderGraph(); renderPlay(); renderRules(); renderLegend(); renderHint(); renderColourHint(); }
+function renderAgentHint() { $('#agents').value = String(state.agents); $('#ahint').textContent = state.agents === 2 ? 'two agents see each other' : ''; }
+function render() { renderGraph(); renderPlay(); renderRules(); renderLegend(); renderHint(); renderColourHint(); renderAgentHint(); }
+// One agent or two.  Choosing two brings the rule A_2x5 and five colours and keeps the one-agent colours, rule and code to give back
+// when one agent is chosen again (a table is not used with two agents, and is not touched).  Callers reset the play and redraw.
+function applyAgents(n) {
+  if (n === state.agents) return;
+  if (n === 2) {
+    state.back = { k: state.k, def: state.def, algoSrc: state.algoSrc };
+    state.agents = 2; state.def = 'a2c5'; state.algoSrc = ''; state.algo = null; state.algoError = null;
+    if (state.k < 5) state.k = 5;
+  } else {
+    const b = state.back; state.back = null; state.agents = 1;
+    state.def = b && b.def !== 'a2c5' ? b.def : 'none'; state.algoSrc = b ? b.algoSrc : ''; state.algo = null; state.algoError = null;
+    if (b) state.k = b.k;
+  }
+  $('#k').value = state.k; $('#agents').value = String(state.agents);
+}
 // The algorithm of the papers in use, or null: it names its colours (init, path, ...) and numbers its rules.  Code in use
 // answers before the fallback, so its colours are an algorithm's only if it is that algorithm's template.
 function activeAlgo() {
@@ -1012,7 +1112,7 @@ function activeAlgo() {
 }
 function namedColours() { return activeAlgo() !== null; }
 function cname(c) { return colourLabel(c, activeAlgo()); }
-function renderLegend() { $('#legend').innerHTML = [...Array(state.k).keys()].map((c) => `<span><span class="sw" style="background:${PAL[c]}"></span>${namedColours() ? cname(c) : c === 0 ? 'white' : c}</span>`).join('') + '<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent</span><span><span class="sw" style="border:2px dashed var(--bad)"></span>never visited</span>'; }
+function renderLegend() { $('#legend').innerHTML = [...Array(state.k).keys()].map((c) => `<span><span class="sw" style="background:${PAL[c]}"></span>${namedColours() ? cname(c) : c === 0 ? 'white' : c}</span>`).join('') + (state.agents === 2 ? '<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent A (works)</span><span><span class="sw" style="border:3px solid var(--warn);width:10px;height:10px"></span>agent B (marks, follows)</span>' : '<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent</span>') + '<span><span class="sw" style="border:2px dashed var(--bad)"></span>never visited</span>'; }
 function renderHint() {
   const h = { node: 'Click on empty space to add a vertex.', edge: state.edgeFrom === null ? 'Click a vertex, then another, to join them.' : `Now click the vertex to join with ${state.edgeFrom} (click it again to cancel).`, move: 'Drag vertices to arrange the drawing.', delete: 'Click a vertex or an edge to remove it.', start: 'Click the vertex where the agent starts.' }[state.mode];
   $('#hint').textContent = h;
@@ -1033,6 +1133,14 @@ function renderGraph() {
     s += `<g class="node${optionSet.has(i) ? ' option' : ''}" data-i="${i}" style="cursor:${state.mode === 'move' ? 'grab' : 'pointer'}">`;
     if (optionSet.has(i)) s += `<circle class="halo" cx="${nd.x}" cy="${nd.y}" r="${r * 1.9}" style="fill:var(--pen)" opacity=".5"/>`;
     if (isCur) s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r * 1.5}" fill="none" style="stroke:var(--pen)" stroke-width="5"/>`;
+    // two agents: A is the purple ring, B the amber ring just inside it, so both show when they stand together; a letter names each
+    // (placed beside the ring, clear of the "start" label above it); a stopped agent's letter is crossed out
+    if (state.agents === 2 && p) {
+      const isB = p.cur2 === i;
+      if (isB) s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r * 1.22}" fill="none" style="stroke:var(--warn)" stroke-width="4"/>`;
+      if (isCur) s += `<text x="${nd.x - r * 1.55}" y="${nd.y - r * 1.15}" text-anchor="end" style="font-size:12px;font-weight:700;fill:var(--pen);pointer-events:none">${p.term[0] ? 'A■' : 'A'}</text>`;
+      if (isB) s += `<text x="${nd.x + r * 1.55}" y="${nd.y - r * 1.15}" text-anchor="start" style="font-size:12px;font-weight:700;fill:var(--warn);pointer-events:none">${p.term[1] ? 'B■' : 'B'}</text>`;
+    }
     if (unv.has(i)) s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r * 1.5}" fill="none" style="stroke:var(--bad)" stroke-width="3" stroke-dasharray="6 5"/>`;
     if (state.edgeFrom === i) s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r * 1.35}" fill="none" style="stroke:var(--warn)" stroke-width="3"/>`;
     s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r}" style="fill:${PAL[col]};stroke:var(--ink)" stroke-width="2.5"/>`;
@@ -1044,8 +1152,11 @@ function renderGraph() {
   });
   svg.innerHTML = s;
 }
+// Two agents: "stopped" means both have, and the return needs both on the start vertex (cur is -1 when they are apart); a play in which neither can
+// act ("stuck") never stops either.
 function playPaperStatus(p) {
-  return paperStatus({ visited: p.vis.size, n: state.nodes.length, cur: p.cur, start: state.start, stopped: !!(p.done && p.done.kind === 'stopped'), cycle: !!(p.done && p.done.kind === 'confined') });
+  const two = state.agents === 2;
+  return paperStatus({ visited: p.vis.size, n: state.nodes.length, cur: two ? (p.cur === p.cur2 ? p.cur : -1) : p.cur, start: state.start, stopped: !!(p.done && p.done.kind === 'stopped'), cycle: !!(p.done && (p.done.kind === 'confined' || p.done.kind === 'stuck')) });
 }
 // one indicator: a label, its value, good / bad / neither, and what it means (the colon and space keep the text readable)
 function pill(label, value, state, title) { return `<span class="pill ${state}" title="${title}"><b>${label}:</b> ${value}</span>`; }
@@ -1054,13 +1165,24 @@ function pills3(cov, ret, term) { return `<div class="pills" role="group" aria-l
 function pillsHtml(p) {
   const n = state.nodes.length, st = playPaperStatus(p), over = !!p.done, stopped = st.termination === 'stopped';
   const cov = pill('coverage', `${p.vis.size} of ${n} visited`, st.covered ? 'good' : over ? 'bad' : '', 'every vertex is visited');
-  const where = stopped ? (st.onStart ? 'stopped on the start vertex' : `stopped on ${NAMES(p.cur)}, not the start ${NAMES(state.start)}`) : (st.onStart ? 'on the start vertex' : `away from the start ${NAMES(state.start)}`);
-  const ret = pill('return', where, stopped ? (st.onStart ? 'good' : 'bad') : '', 'the agent ends on the start vertex');
-  const term = pill('termination', { running: 'running', stopped: 'stopped', never: 'never stops (a position repeats)' }[st.termination], stopped ? 'good' : st.termination === 'never' ? 'bad' : '', 'the agent stops');
+  const two = state.agents === 2;
+  const where = two
+    ? (stopped ? (st.onStart ? 'both stopped on the start vertex' : `A stopped on ${NAMES(p.cur)}, B on ${NAMES(p.cur2)}, not both on the start ${NAMES(state.start)}`) : (st.onStart ? 'both on the start vertex' : `A at ${NAMES(p.cur)}, B at ${NAMES(p.cur2)}`))
+    : stopped ? (st.onStart ? 'stopped on the start vertex' : `stopped on ${NAMES(p.cur)}, not the start ${NAMES(state.start)}`) : (st.onStart ? 'on the start vertex' : `away from the start ${NAMES(state.start)}`);
+  const ret = pill('return', where, stopped ? (st.onStart ? 'good' : 'bad') : '', two ? 'both agents end on the start vertex' : 'the agent ends on the start vertex');
+  const termText = two && p.done && p.done.kind === 'stuck' ? 'stuck: neither agent can act'
+    : two && !over && (p.term[0] || p.term[1]) ? `${p.term[0] ? 'A' : 'B'} has stopped, the other is running`
+    : { running: 'running', stopped: two ? 'both stopped' : 'stopped', never: 'never stops (a position repeats)' }[st.termination];
+  const term = pill('termination', termText, stopped ? 'good' : st.termination === 'never' ? 'bad' : '', two ? 'both agents stop' : 'the agent stops');
   return pills3(cov, ret, term);
 }
 function stoppedBanner(p) {
   const ps = playPaperStatus(p), steps = p.steps.length, unv = p.done.unvisited;
+  if (state.agents === 2) {
+    if (ps.outcome === 'explores') return `<div class="banner good"><b>Explored in this play (paper model).</b> Every vertex was visited and both agents stopped on the start vertex ${NAMES(state.start)} after ${steps} steps. These are this play's choices; the Analysis tab checks every adversary, including which agent is activated.</div>`;
+    if (ps.outcome === 'stopped_early') return `<div class="banner bad"><b>Stopped early in this play.</b> Both agents stopped (A on ${NAMES(p.cur)}, B on ${NAMES(p.cur2)}) after ${steps} steps, but <b>${unv.map(NAMES).join(', ')}</b> ${unv.length === 1 ? 'was' : 'were'} never visited.</div>`;
+    return `<div class="banner bad"><b>Stopped away from the start in this play.</b> Every vertex was visited, but the agents stopped on ${NAMES(p.cur)} and ${NAMES(p.cur2)}, not both on the start vertex ${NAMES(state.start)}.</div>`;
+  }
   if (ps.outcome === 'explores') return `<div class="banner good"><b>Explored in this play (paper model).</b> Every vertex was visited and the agent stopped on the start vertex ${NAMES(state.start)} after ${steps} steps. These are this play's choices; the Analysis tab checks every adversary.</div>`;
   if (ps.outcome === 'stopped_early') return `<div class="banner bad"><b>Stopped early in this play.</b> The agent stopped on ${NAMES(p.cur)} after ${steps} steps, but <b>${unv.map(NAMES).join(', ')}</b> ${unv.length === 1 ? 'was' : 'were'} never visited.</div>`;
   return `<div class="banner bad"><b>Stopped away from the start in this play.</b> Every vertex was visited, but the agent stopped on ${NAMES(p.cur)}, not on the start vertex ${NAMES(state.start)}.</div>`;
@@ -1068,7 +1190,8 @@ function stoppedBanner(p) {
 function renderPlay() {
   const p = state.play, box = $('#playstatus');
   if (!p) { box.innerHTML = '<p class="note">Draw a graph to start.</p>'; $('#ledger tbody').innerHTML = ''; return; }
-  let s = `<div class="row"><b>Step ${p.steps.length}</b><span class="small">agent at <b>${NAMES(p.cur)}</b>, ${p.vis.size} of ${state.nodes.length} visited</span>${state.replay ? `<span class="small" style="color:var(--pen)">replaying a found execution (${Math.min(state.replay.index, state.replay.steps.length)}/${state.replay.steps.length})</span>` : ''}</div>`;
+  const two = state.agents === 2, who = (a) => (a === 0 ? 'A' : 'B');
+  let s = `<div class="row"><b>Step ${p.steps.length}</b><span class="small">${two ? `agent A at <b>${NAMES(p.cur)}</b>${p.term[0] ? ' (stopped)' : ''}, agent B at <b>${NAMES(p.cur2)}</b>${p.term[1] ? ' (stopped)' : ''}` : `agent at <b>${NAMES(p.cur)}</b>`}, ${p.vis.size} of ${state.nodes.length} visited</span>${state.replay ? `<span class="small" style="color:var(--pen)">replaying a found execution (${Math.min(state.replay.index, state.replay.steps.length)}/${state.replay.steps.length})</span>` : ''}</div>`;
   if (paperMode()) s += pillsHtml(p);
   if (state.defining) {
     const d = state.defining;
@@ -1077,14 +1200,15 @@ function renderPlay() {
       <p class="note">The row goes into the table (Rules tab) and the play resumes.</p>`;
   } else if (p.pending) {
     const pd = p.pending;
-    s += `<div class="row small">reads <span class="mono">${pd.row}</span> ${bagChips(pd.row)} <span style="color:var(--soft)">(${pd.source}${pd.rule ? ` · rule ${ruleTag(activeAlgo(), pd.rule).replace(/^r/, '')}` : ''})</span></div>`;
+    s += `<div class="row small">${two ? `<b>agent ${who(pd.agent)}</b> ` : ''}reads <span class="mono">${pd.row}</span> ${bagChips(pd.row)} <span style="color:var(--soft)">(${pd.source}${pd.rule ? ` · rule ${ruleTag(activeAlgo(), pd.rule).replace(/^r/, '')}` : ''})</span></div>`;
     if (pd.rule && ruleText(activeAlgo(), pd.rule)) s += `<div class="row small note">rule ${ruleTag(activeAlgo(), pd.rule).replace(/^r/, '')}: ${ruleText(activeAlgo(), pd.rule)}</div>`;
-    s += `<div class="row small">paints <span class="sw" style="background:${PAL[pd.paint]}"></span>${cname(pd.paint)}, then ${pd.target === -2 ? '<b>stops</b> (paper model)' : pd.target === -1 ? 'stays' : pd.options.length === 0 ? `no ${cname(pd.target)} neighbour: stays` : `moves to ${article(cname(pd.target))} <b>${cname(pd.target)}</b> neighbour`}</div>`;
+    s += `<div class="row small">paints <span class="sw" style="background:${PAL[pd.paint]}"></span>${cname(pd.paint)}, then ${pd.target === -2 ? '<b>stops</b> (paper model)' : pd.target === -1 ? 'stays' : pd.target === -4 ? (pd.options.length ? 'moves to its <b>partner</b>' : 'its partner is not next door: stays') : pd.options.length === 0 ? `no ${cname(pd.target)} neighbour: stays` : `moves to ${article(cname(pd.target))} <b>${cname(pd.target)}</b> neighbour`}</div>`;
     if (pd.options.length) s += `<div class="row small">adversary may serve: ${pd.options.map((u) => `<b>${NAMES(u)}</b>`).join(', ')}${pd.options.length >= 2 ? ` · auto would pick <b>${NAMES(pd.auto)}</b>` : ''}</div>`;
     if (pd.options.length >= 2 && !(state.replay && state.replay.index < state.replay.steps.length)) s += `<div class="banner neutral" id="choicehint">Your move as the adversary: click a highlighted vertex (or Auto step).</div>`;
   } else if (p.done) {
     if (p.done.kind === 'explored') s += `<div class="banner good">Explored: all ${state.nodes.length} vertices visited in ${p.steps.length} steps.</div>`;
     else if (p.done.kind === 'stopped') s += stoppedBanner(p);
+    else if (p.done.kind === 'stuck') s += `<div class="banner bad"><b>Stuck.</b> Neither agent has anything to do, and they have not both stopped.${p.done.unvisited.length ? ` Never visited: <b>${p.done.unvisited.map(NAMES).join(', ')}</b>.` : ''}</div>`;
     else if (p.done.kind === 'confined' && paperMode()) s += `<div class="banner bad"><b>Never stops, under these choices.</b> The position after step ${p.steps.length} already occurred before step ${p.done.repeatAt + 1}, so these ${p.steps.length - p.done.repeatAt} steps repeat for ever unless the adversary chooses differently. ${p.done.unvisited.length ? `Never visited: <b>${p.done.unvisited.map(NAMES).join(', ')}</b>.` : 'Every vertex was visited, but the agent does not stop.'}</div>`;
     else if (p.done.kind === 'confined') s += `<div class="banner bad">Trapped: the position after step ${p.steps.length} already occurred before step ${p.done.repeatAt + 1}, so these ${p.steps.length - p.done.repeatAt} steps repeat for ever. Never visited: <b>${p.done.unvisited.map(NAMES).join(', ')}</b>.</div>`;
     else s += `<div class="banner bad">${p.done.message}</div>`;
@@ -1094,7 +1218,7 @@ function renderPlay() {
   const tb = $('#ledger tbody'); let rows = '';
   const cycFrom = p.done && p.done.kind === 'confined' ? p.done.repeatAt : (state.replay && state.replay.index >= state.replay.steps.length ? state.replay.repeatAt : null);
   p.steps.forEach((st, i) => {
-    rows += `<tr class="${cycFrom !== null && cycFrom !== undefined && i >= cycFrom ? 'cycle' : ''}"><td class="mono">${i}</td><td><b>${NAMES(st.cur)}</b></td><td><span class="mono">${st.row}</span> ${bagChips(st.row)}${st.rule ? ` <span class="small" title="${ruleText(activeAlgo(), st.rule) || 'rule ' + st.rule}">· ${ruleTag(activeAlgo(), st.rule)}</span>` : ''}</td><td><span class="sw" style="background:${PAL[st.paint]}"></span>${st.target === -1 ? 'stay' : st.target === -2 ? '■ stop' : '→ ' + cname(st.target)}</td><td>${st.options.map(NAMES).join(', ') || '—'}</td><td>${st.next === null ? (st.target === -2 ? 'stops' : 'stays') : `<b>${NAMES(st.next)}</b>${st.options.length >= 2 ? ' ◆' : ''}`}</td></tr>`;
+    rows += `<tr class="${cycFrom !== null && cycFrom !== undefined && i >= cycFrom ? 'cycle' : ''}"><td class="mono">${i}</td><td>${st.agent !== undefined ? `<b>${who(st.agent)}</b> ` : ''}<b>${NAMES(st.cur)}</b></td><td><span class="mono">${st.row}</span> ${bagChips(st.row)}${st.rule ? ` <span class="small" title="${ruleText(activeAlgo(), st.rule) || 'rule ' + st.rule}">· ${ruleTag(activeAlgo(), st.rule)}</span>` : ''}</td><td><span class="sw" style="background:${PAL[st.paint]}"></span>${st.target === -1 ? 'stay' : st.target === -2 ? '■ stop' : st.target === -3 ? 'wait' : st.target === -4 ? '→ partner' : '→ ' + cname(st.target)}</td><td>${st.options.map(NAMES).join(', ') || '—'}</td><td>${st.next === null ? (st.target === -2 ? 'stops' : 'stays') : `<b>${NAMES(st.next)}</b>${st.options.length >= 2 ? ' ◆' : ''}`}</td></tr>`;
   });
   // follow the newest step inside the ledger's own box, but only if it was already at the bottom (not while you read
   // older rows), and never scroll the panel or the page: scrollIntoView on the last row did that at every step
@@ -1107,6 +1231,10 @@ function renderPlay() {
 }
 function colourOptions(withStay) { let s = ''; for (let c = 0; c < state.k; c++) s += `<option value="${c}">${namedColours() ? c + ' ' + cname(c) : c === 0 ? '0 white' : c}</option>`; if (withStay) s += '<option value="-1">stay</option><option value="-2">stop (paper model)</option>'; return s; }
 function renderRules() {
+  const two = state.agents === 2;
+  $('#rules-one').hidden = two; $('#rules-two').hidden = !two;
+  if (two) $('#two-rules tbody').innerHTML = A2C5_RULES.slice(1).map((t, i) => `<tr><td class="mono">T${i + 1}</td><td style="white-space:normal">${t}</td></tr>`).join('');
+  $('#walks-two').hidden = !two; if (!pending.size) $('#b-walks').disabled = two; // quick walks are for one agent
   ensureAlgo();
   const ta = $('#algo'); if (document.activeElement !== ta && ta.value !== state.algoSrc) ta.value = state.algoSrc;
   const st = $('#algo-status');
@@ -1144,13 +1272,14 @@ function analysisPills(r) {
   return pills3(cov, ret, term);
 }
 function paperSummary(r) {
-  const t = r.trace, steps = t.steps.length, pills = analysisPills(r);
-  if (r.status === 'explores') return `<div class="banner good"><b>Explores against every adversary (paper model).</b> ${r.positions.toLocaleString()} positions enumerated, none losing: every vertex is visited and the agent stops on the start vertex ${NAMES(t.stopped_at)}. The adversary can delay the stop to step ${steps} at most; that longest obstruction is loaded below.</div>${pills}`;
+  const t = r.trace, steps = t.steps.length, pills = analysisPills(r), two = r.agents === 2;
+  if (r.status === 'explores') return `<div class="banner good"><b>Explores against every adversary (paper model).</b> ${r.positions.toLocaleString()} positions enumerated, none losing: every vertex is visited and ${two ? 'both agents stop' : 'the agent stops'} on the start vertex ${NAMES(t.stopped_at)}.${two ? ' The adversary chose both which agent is activated and where it goes.' : ''} The adversary can delay the stop to step ${steps} at most; that longest obstruction is loaded below.</div>${pills}`;
   const how = r.method === 'exact game' ? `Exact game over ${r.positions.toLocaleString()} positions: the adversary has a strategy under which` : `Found by an adversary ${r.method}: under it`;
   const what = {
     never_stops: `the agent never stops (the last ${steps - t.repeat_at} of the ${steps} steps repeat for ever)`,
     stopped_early: `the agent stops on ${NAMES(t.stopped_at)} while <b>${t.unvisited.map(NAMES).join(', ')}</b> ${t.unvisited.length === 1 ? 'is' : 'are'} still unvisited`,
     stopped_off_start: `the agent visits every vertex but stops on ${NAMES(t.stopped_at)}, not on the start vertex`,
+    stuck: 'neither agent can act, and they have not both stopped',
   }[r.reason];
   return `<div class="banner bad"><b>Fails (paper model).</b> ${how} ${what}.</div>${pills}`;
 }
@@ -1165,17 +1294,18 @@ function traceSummary(r) {
 function cancelAnalysis(html) {
   startWorker(); pending.clear();
   $('#analysis').innerHTML = html;
-  $('#b-exact').disabled = false; $('#b-walks').disabled = false; $('#b-cancel').disabled = true;
+  $('#b-exact').disabled = false; $('#b-walks').disabled = state.agents === 2; $('#b-cancel').disabled = true;
 }
 // Whatever the Analysis tab shows, or is still computing, was for the graph that has just been replaced: its text
 // and its "Load this execution" button would be about a graph that is no longer there.
 function forgetAnalysis() { if (pending.size) cancelAnalysis(''); else $('#analysis').innerHTML = ''; }
 async function analyse(cmd) {
   if (!engine || !state.play) return;
+  if (cmd === 'walks' && state.agents === 2) return; // the walks are for one agent
   const out = $('#analysis'); out.innerHTML = '<div class="banner neutral">Running…</div>'; $('#b-exact').disabled = true; $('#b-walks').disabled = true; $('#b-cancel').disabled = false;
   const extra = cmd === 'exact' ? { cap: Math.max(1000, +$('#cap').value || 1000000) } : { walks: Math.max(0, +$('#walks').value || 0), budget: 200000 };
   const r = await runInWorker(requestText(cmd, extra));
-  $('#b-exact').disabled = false; $('#b-walks').disabled = false; $('#b-cancel').disabled = true;
+  $('#b-exact').disabled = false; $('#b-walks').disabled = state.agents === 2; $('#b-cancel').disabled = true;
   if (!r) return;
   let s = '';
   if (r.status === 'error') s = `<div class="banner bad">${r.message}</div>`;
@@ -1225,11 +1355,15 @@ document.querySelectorAll('header [data-mode]').forEach((b) => b.addEventListene
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 $('#k').addEventListener('change', (e) => { state.k = +e.target.value; let dropped = 0; for (const [r, a] of [...state.table.entries()]) { const own = +r.split('.')[0], bag = r.split('.')[1]; if (own >= state.k || a.paint >= state.k || a.target >= state.k || bag.length > state.k || [...bag].some((d, i) => i >= state.k && d !== '0')) { state.table.delete(r); dropped++; } } if (dropped) flash(`${dropped} table rows used colours beyond the new palette and were removed.`); save(); resetPlay(); render(); });
 $('#preset').addEventListener('change', (e) => { const v = e.target.value; e.target.value = ''; if (!v) return; if (v === 'clear') { state.nodes = []; state.edges = []; state.start = 0; forgetAnalysis(); resetPlay(); save(); render(); return; } const pr = PRESETS[v];
+  const want = pr.agents || 1; // a preset brings the number of agents it is for: two agents bring the rule A_2x5 and five colours
+  if (want !== state.agents) applyAgents(want);
+  if (want === 2) { state.k = pr.k; $('#k').value = pr.k; loadGraphText(pr.text, pr.coords, pr.box); return; }
   if (pr.def) { // the preset brings its own rule: rows and code in use would win over it, so they go
     if ((state.table.size || state.algoSrc) && !confirm(`This preset uses the rule ${pr.def}. It replaces the rule you have in use (${state.table.size} defined row${state.table.size === 1 ? '' : 's'}${state.algoSrc ? ' and the algorithm' : ''}). Continue?`)) return;
     state.def = pr.def; state.table = new Map(); state.algoSrc = ''; state.algo = null; state.algoError = null;
   }
   state.k = pr.k; $('#k').value = pr.k; loadGraphText(pr.text, pr.coords, pr.box); });
+$('#agents').addEventListener('change', (e) => { applyAgents(+e.target.value === 2 ? 2 : 1); forgetAnalysis(); save(); resetPlay(); render(); });
 $('#b-import-graph').addEventListener('click', () => { $('#graphtext').value = graphText(); $('#graphdialog').showModal(); });
 $('#b-random').addEventListener('click', makeRandomGraph);
 $('#rn').addEventListener('keydown', (e) => { if (e.key === 'Enter') makeRandomGraph(); });
@@ -1280,7 +1414,7 @@ document.addEventListener('keydown', (e) => {
 
 // ------------------------------------------------------------ start
 if (!restore()) { const pr = PRESETS.sketch1; state.k = 5; loadGraphText(pr.text, pr.coords, pr.box); state.def = 'sigma'; save(); }
-$('#k').value = state.k;
+$('#k').value = state.k; $('#agents').value = String(state.agents);
 resetPlay(); render();
 })();
 </script>

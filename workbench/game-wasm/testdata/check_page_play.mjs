@@ -18,7 +18,7 @@ let src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const head = '(async function () {', tail = /resetPlay\(\); render\(\);\n\}\)\(\);\s*$/;
 if (!src.includes(head) || !tail.test(src)) throw new Error('the page script no longer has the shape this test expects');
 src = src.replace(head, 'globalThis.__ready = ' + head).replace(tail, `resetPlay(); render();
-globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph, analyse, togglePlay };
+globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph, analyse, togglePlay, applyAgents };
 })();`);
 
 // a stand-in for an element: remembers what is set on it, answers every method with itself (and notes which were called)
@@ -365,6 +365,85 @@ for (const n of [3, 5, 8, 10, 14]) for (let rep = 0; rep < 3; rep++) {
   check(nodes.every((nd, v) => parent[v] < 0 || nd.y > nodes[parent[v]].y), `tree n=${n}: every vertex is below its parent`);
   check(nodes.every((nd) => nd.x >= 50 && nd.x <= 950 && nd.y >= 40 && nd.y <= 600), `tree n=${n}: on the canvas`);
 }
+
+// 15. two agents (A_2x5), as the buttons drive them: the agent selector brings the rule and five colours, the engine names the agent that
+//     acts, the play ends when both have stopped on the start vertex, and the hand trace of the path is reproduced step by step
+Object.assign(P.state, { k: 4, def: 'sigma', table: new Map(), algoSrc: '', algo: null, algoError: null });
+P.loadGraphText('3 0 0-1,1-2'); P.applyAgents(2); P.save(); P.loadGraphText('3 0 0-1,1-2');
+same([P.state.agents, P.state.k, P.state.def, P.paperMode(), P.cname(4)], [2, 5, 'a2c5', true, 'head'], 'choosing two agents brings five colours and the rule A_2x5, which names its colours');
+check(P.requestText('step', {}).includes('agents 2\n') && P.requestText('step', {}).includes('default a2c5\n') && !P.requestText('step', {}).includes('table\n'), 'the request says two agents, the built-in rule, and sends no table');
+P.render();
+const svgStart = String(element('#svg').innerHTML);
+check(svgStart.includes('>A</text>') && svgStart.includes('>B</text>'), 'both agents are drawn on the start vertex, named A and B');
+check(String(element('#legend').innerHTML).includes('agent A') && String(element('#legend').innerHTML).includes('agent B'), 'the legend names both agents');
+same(String(element('#khint').textContent), 'A_2x5 needs 5 colours', "the colour hint is the rule's");
+same(String(element('#ahint').textContent), 'two agents see each other', 'and the agents hint says what two agents are');
+check(element('#rules-one').hidden === true && element('#rules-two').hidden === false && String(element('#two-rules tbody').innerHTML).split('<tr>').length - 1 === 21, 'the Rules tab shows the 21 rules instead of the one-agent editor');
+{
+  const p = P.state.play;
+  same([p.pending.agent, p.pending.rule, p.pending.row], [0, 2, '0.10000@h'], 'the first step: agent A, rule 2, reading its row with its partner on the vertex');
+  r = run(100);
+  same([p.done.kind, r.steps, P.playPaperStatus(p).outcome], ['stopped', 17, 'explores'], 'the path 0-1-2 ends after the 17 steps of the hand trace, with both agents stopped on the start');
+  same(p.steps.map((s) => s.rule), [2, 14, 17, 5, 13, 4, 17, 6, 10, 18, 20, 6, 10, 18, 20, 8, 11], 'the rule numbers of the hand trace');
+  same(p.steps.map((s) => s.agent), [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1], 'and the agent that acts at each step (A works, B follows)');
+  same([p.cur, p.cur2, p.term], [0, 0, [true, true]], 'both stopped on vertex 0');
+  const shown = panel(), text = shown.replace(/<[^>]+>/g, '');
+  check(shown.includes('Explored in this play (paper model)') && text.includes('both agents stopped on the start vertex 0'), 'the banner says that both agents stopped on the start');
+  check(['coverage: 3 of 3 visited', 'return: both stopped on the start vertex', 'termination: both stopped'].every((t) => text.includes(t)), `the three indicators for two agents: ${text.slice(0, 200)}`);
+  P.render();
+  const ledger = String(element('#ledger tbody').innerHTML);
+  check(ledger.includes('<b>B</b> <b>1</b>') && ledger.includes('· T17') && ledger.includes('→ partner') && ledger.includes('■ stop'), 'the ledger names the agent, tags the rules T17, and shows partner moves and stops');
+  check(String(element('#svg').innerHTML).includes('A■') && String(element('#svg').innerHTML).includes('B■'), 'a stopped agent is marked on the graph');
+  P.undo();
+  check(p.done === null && p.steps.length === 16 && p.term[1] === false && p.pending && p.pending.agent === 1, 'undo after the second stop brings agent B back, about to stop');
+  P.stepOnce(true);
+  same([p.done && p.done.kind, p.steps.length], ['stopped', 17], 'and stepping again stops again');
+}
+// the exact search of the engine, then its longest obstruction replayed in the page
+setup({ k: 5, def: 'a2c5', graph: '4 2 0-1,0-2,0-3,1-2,1-3' }); // setup() leaves the agents as they are: two
+{
+  const found = P.engine(P.requestText('exact', { cap: 1000000 }));
+  same([found.status, found.agents, found.positions, found.trace.stopped_at], ['explores', 2, 78, 2], 'the diamond: the engine explores it with two agents against every adversary');
+  P.loadReplay(found.trace); r = run(300);
+  const pl = P.state.play;
+  same([pl.done.kind, P.playPaperStatus(pl).outcome, pl.steps.map((s) => s.rule)], ['stopped', 'explores', found.trace.steps.map((s) => s.rule)], "the replay follows the engine's execution rule by rule and ends in the same place");
+  same(pl.steps.map((s) => s.agent), found.trace.steps.map((s) => s.agent), 'with the same agent acting at each step');
+}
+// a destination the adversary may choose is chosen by the user, as with one agent: Step waits
+setup({ k: 5, def: 'a2c5', graph: '4 2 0-1,0-2,0-3,1-2,1-3' });
+{
+  const p = P.state.play;
+  same(p.pending.options, [0, 1], 'the first step from the degree-2 start 2: the adversary may serve 0 or 1');
+  P.stepOnce(false); // two options and no click: the play waits for the adversary
+  same(p.steps.length, 0, 'Step waits for your choice as the adversary');
+  P.stepOnce(true);
+  same(p.steps.length, 1, 'Auto step chooses for it');
+}
+// random graphs of every size and family: two agents explore them in the page (the engine's `step` names the agent each time)
+{
+  const generate2 = (family, n) => { element('#rfam').value = family; element('#rn').value = String(n); alerts.length = 0; P.makeRandomGraph(); return alerts.length === 0; };
+  Object.assign(P.state, { k: 5, def: 'a2c5' });
+  let plays = 0;
+  for (const family of ['any', 'ktf', 'tree', 'cycle']) for (const n of [3, 4, 5, 6, 9, 12, 20]) {
+    check(generate2(family, n), `${family} n=${n}: generated`);
+    const ex = P.engine(P.requestText(n <= 6 ? 'exact' : 'play', n <= 6 ? { cap: 5000000 } : { budget: 100000 }));
+    same(ex.status, 'explores', `${family} n=${n}: the engine says two agents explore ${P.state.edges.map(([u, v]) => u + '-' + v).join(',')}`);
+    run(5000);
+    same([P.state.play.done && P.state.play.done.kind, P.playPaperStatus(P.state.play).outcome], ['stopped', 'explores'], `${family} n=${n}: the page's own play with two agents explores`);
+    plays++;
+  }
+  check(plays >= 25, `${plays} random graphs played with two agents`);
+}
+// back to one agent: the colours, the rule and the code of before come back, the table was never touched, and the walks are back
+Object.assign(P.state, { k: 4, def: 'sigma', agents: 1, back: null });
+P.applyAgents(2); same([P.state.agents, P.state.k, P.state.def], [2, 5, 'a2c5'], 'two agents again');
+P.state.table = new Map([['0.10', { paint: 1, target: 0 }]]);
+P.applyAgents(1); P.loadGraphText('4 0 0-1,0-2,1-3'); P.save();
+same([P.state.agents, P.state.k, P.state.def, P.state.table.size], [1, 4, 'sigma', 1], 'one agent again: the colours and the rule of before are back, and the table was never touched');
+P.render();
+same([element('#rules-one').hidden, element('#rules-two').hidden, element('#b-walks').disabled], [false, true, false], 'the one-agent Rules tab and the walks are back');
+// the engine refuses what the page never sends, with a message
+check(String(P.engine('cmd walks\nagents 2\nk 5\ngraph 3 0 0-1,1-2\ndefault a2c5\n').message).includes('walks are not offered for two agents'), 'the engine refuses the walks for two agents');
 
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

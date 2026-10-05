@@ -159,7 +159,7 @@ fn ac4_reproduces_the_rule_sequences_printed_in_figure_two() {
 
 // ---------------------------------------------------------------- small graphs and their classes
 /// A representative of every connected graph on `n` vertices up to isomorphism, as an edge list.
-fn connected_graphs(n: usize) -> Vec<Vec<(u8, u8)>> {
+pub(crate) fn connected_graphs(n: usize) -> Vec<Vec<(u8, u8)>> {
     let pairs: Vec<(usize, usize)> = (0..n).flat_map(|a| (a + 1..n).map(move |b| (a, b))).collect();
     let index = |a: usize, b: usize| pairs.iter().position(|&p| p == (a.min(b), a.max(b))).unwrap();
     fn permutations(items: &mut Vec<usize>, at: usize, out: &mut Vec<Vec<usize>>) {

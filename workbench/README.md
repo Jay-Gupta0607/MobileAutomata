@@ -11,7 +11,7 @@ libraries or web fonts.
 
     sh workbench/build.sh          # needs: rustup target add wasm32-unknown-unknown
 
-produces `site/game.wasm` (~90 KB) and `../docs/index.html`, the same page with the engine inlined (base64),
+produces `site/game.wasm` (~125 KB) and `../docs/index.html`, the same page with the engine inlined (base64),
 which opens from a `file://` URL and is what GitHub Pages serves (the build also writes `site/standalone.html`, an
 identical copy that is git-ignored, so a fresh clone has only `docs/index.html`).  `site/index.html` +
 `site/game.wasm` are for serving over HTTP (any static server, e.g. `python -m http.server 8000 --directory
@@ -52,6 +52,13 @@ or newer.
   rows in use are left alone.  A size outside the family's range (a cycle needs 3) is refused with a message and the
   canvas stays as it was.  Replacing the whole graph (this option, a preset, Import) also clears the Analysis tab and
   cancels a search still running, since a result belongs to the graph it was computed for.
+* **Two agents.** The *agents* box in the header chooses one agent or two.  Two agents see each other and run one built-in
+  rule, **A_2x5**, with five colours (init, path, neigh, fin, head); the number of colours is set to five, tables and code
+  are for one agent (they are kept, and come back when you choose one agent again).  The graph shows agent A (purple ring,
+  the one that works) and agent B (amber ring, the one that marks the head and follows); the Play tab names the agent that
+  acts at each step and the ledger tags rules T1 to T21; the Rules tab lists them.  *Search all executions* enumerates every
+  choice of which agent is activated and of where it goes; the quick walks are not offered.  Presets: the 17-step hand-trace
+  path, the diamond (K4 minus an edge: A_US5 alone fails on it, two agents do not), K4 and Sketch I.  See **Two agents** below.
 * **Play.** *Play* steps at the speed of the slider.  Its clock is a timer inside a Web Worker rather than a timer of the
   page, and each tick does the steps that are due by the clock, so a play keeps its speed while you are in another tab
   (a browser slows the timers of a page nobody is looking at; a tick that comes late catches up instead).  A hidden
@@ -236,3 +243,62 @@ connected graph of up to seven vertices, up to isomorphism, from every start ver
 an undefined row or a request for a colour no neighbour has, which the paper counts as a failure but the engine would
 turn into a stay (none occurs); failures outside the classes (A_TC3 fails on a triangle with a pendant vertex, as
 Theorem 13 of the paper requires of any three-colour rule; A_US5 on the diamond, A_C4 on K4).
+
+## Two agents (`agents 2`)
+
+A second agent changes what a rule can do, so it is a separate model, with a separate rule.  These are assumptions of this
+workbench, not a published model (the papers above are about one agent):
+
+* Two identical oblivious agents start together on the start vertex; every vertex starts in colour 0.
+* An agent sees its vertex colour, whether the other agent is on that vertex, and for every neighbour its colour and whether
+  the other agent is on it.  It may ask to move to a neighbour of a colour, to the neighbour that holds the other agent
+  (its *partner*), to stay, to stop, or to wait.
+* The scheduler is sequential and fair: the adversary activates one agent per step and picks the destination among equal
+  candidates.  An agent whose rule says *wait* has nothing to do, so a fair scheduler cannot starve the other.  Agents on the
+  same vertex see the same row and act the same way, so then only agent 0 is stepped (the other choice is the mirror image);
+  agent 0 is therefore the one that works and agent 1 the one that waits and follows.
+* The agents explore when every vertex is visited and **both** have stopped on the start vertex.
+
+Why the model matters: if the adversary may activate both identical agents at once (fully or semi-synchronous), it can send
+them to the same neighbour every time, so the pair behaves as one agent and any lower bound for one agent holds for the
+pair.  What the second agent buys here is the ability to see where the other is.
+
+### The algorithm A_2x5 (`default a2c5`)
+
+The semi-DFS of A_US5 and A_Gen6 (an induced path, a head, a finished set) with the five colours of A_US5: 0 init, 1 path,
+2 neigh, 3 fin, 4 head.  A probe that is accepted turns its vertex into a second head, and a rejected neighbour cleaning
+itself up may touch both heads; one colour cannot say which to return to, but the agent can go back to *its partner*, which
+stands on the old head.  A finished head is painted fin before the cleanup, which flags the backtrack (A_US5 recolours the
+predecessor for that).  The 21 rules, T1 to T21, are in `game-wasm/src/two.rs` (and in the page's Rules tab); a row is
+`own.bag@p`, with `p` = `h` (the other agent is on this vertex), the colour digit of the neighbour holding it, or `-`
+(not next door), for example `4.11001@h`.
+
+How it is checked (`cargo test`): every rule on a row written out by hand; the hand trace of the path 0-1-2 (17 steps,
+rule and agent at each step); every connected graph of up to six vertices from every start vertex against every adversary
+(and up to seven with `cargo test --release -- --ignored`), with the number of positions the exact game enumerates equal to
+the totals of an independent implementation of this model (20, 180, 1,832, 20,226, 300,870, and 6,157,922 for seven vertices);
+the diamond, which one agent running A_US5 fails and two agents explore; and a scan of every reachable position for a request
+for a colour nobody has or a partner who is not next door (none occurs).  The independent implementation (not in this
+repository) also covered all 11,117 connected graphs of eight vertices (88,936 graph-start pairs), and found that the same
+rules fail if the return to the partner is replaced by a request for a colour.  This is exhaustive up to eight vertices, not
+a proof for all graphs.  The fixtures `two_*.req` hold the same answers natively and in WebAssembly; `check_page_play.mjs`
+plays the 17-step trace, the diamond (including a replay of the engine's longest execution) and random graphs of four
+families up to 20 vertices through the real page script with two agents.
+
+### In the protocol and the command line
+
+Keys: `agents 2`, `default a2c5` (required), `k` of at least 5.  A table, `model classic` and `cmd walks` are errors.
+`cmd step` takes `colours`, `cur` (agent A), `cur2` (agent B), `term t1 t2` (1 = that agent has stopped) and `vis`, and
+answers with the agent that acts (`agent`: 0 or 1, agent 0 when both could), `row`, `rule`, `paint`, `target` and `options`;
+a partner move lists the partner's vertex as its one option, `target` -4 means partner, -3 wait (never returned by `step`),
+-1 stay, -2 stop; `{"over":true}` when both have stopped and `{"stuck":true}` when neither can act.  `exact` and `play`
+answer as for one agent, plus `"agents":2`, with every trace step carrying `agent`, `cur`, `other` and `rule`; a failure
+carries a `reason` as before or `stuck`.  `cmd answer` takes `row own.bag@p`.
+
+    cargo run --bin explore -- exact --agents 2 --graph "4 2 0-1,0-2,0-3,1-2,1-3" --summary
+    cargo run --bin explore -- play --agents 2 --graph "3 0 0-1,1-2" --prefer "1 2 0"
+    cargo run --bin explore -- answer --agents 2 --row 4.11001@h
+
+`--agents 2` takes `a2c5` as the rule and five colours by itself; a table, `--rule` other than `a2c5` and the `walks`
+command are refused, and so is `--rule a2c5` without `--agents 2`.
+
