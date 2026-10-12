@@ -8,7 +8,7 @@
 :root{
   --paper:#f6f5fa; --surface:#ffffff; --ink:#241f45; --soft:#6a6389; --rule:#d9d5e8; --pen:#4f3a9e; --pen-soft:#ebe6fb;
   --good:#1f7a55; --good-bg:#e3f3eb; --bad:#b42b2b; --bad-bg:#f9e4e4; --warn:#8a6400; --warn-bg:#f7efd6;
-  --c0:#ffffff; --c1:#f4b63e; --c2:#2faf9b; --c3:#e04e67; --c4:#3d74e6; --c5:#8e5ad6;
+  --c0:#ffffff; --c1:#f4b63e; --c2:#2faf9b; --c3:#e04e67; --c4:#3d74e6; --c5:#8e5ad6; --cred:#e5484d; --cgreen:#3aa655;
   --mono:ui-monospace,Menlo,Consolas,monospace; --body:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root{
@@ -88,8 +88,8 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
     <button type="button" data-mode="start" aria-pressed="false" title="Click a vertex to make it the start (S)">Set start</button>
   </div>
   <div class="group"><label for="k">colours</label><select id="k"><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option></select><span id="khint" class="khint" role="status"></span></div>
-  <div class="group"><label for="agents">agents</label><select id="agents" title="One agent, or two that see each other and run the built-in rule A_2x5 (five colours)"><option value="1" selected>1</option><option value="2">2</option></select><span id="ahint" class="khint" role="status"></span></div>
-  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I</option><option value="sketch2">Sketch II</option><option value="paw">paw + pendant</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="atc3cycle" title="Selects the rule A_TC3 and three colours">A_TC3 · 5-cycle</option><option value="atc3tree" title="Selects the rule A_TC3 and three colours">A_TC3 · binary tree</option><option value="ac4fig2a" title="Selects the rule A_C4 and four colours">A_C4 · bridge + 4-cycle</option><option value="ac4fig2b" title="Selects the rule A_C4 and four colours">A_C4 · K3,2</option><option value="aus5k4" title="Selects the rule A_US5 and five colours">A_US5 · K4</option><option value="aus5k4tail" title="Selects the rule A_US5 and five colours">A_US5 · K4 with a tail</option><option value="a2path" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · path</option><option value="a2diamond" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · diamond</option><option value="a2k4" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · K4</option><option value="a2sketch1" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · Sketch I</option><option value="clear">empty canvas</option></select></div>
+  <div class="group"><label for="agents">agents</label><select id="agents" title="One agent, or two that see each other and run a built-in rule: A_2x5 (take turns, five colours) or A_2x4 (act together, four colours)"><option value="1" selected>1</option><option value="2">2</option></select><span id="ahint" class="khint" role="status"></span></div>
+  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I</option><option value="sketch2">Sketch II</option><option value="paw">paw + pendant</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="atc3cycle" title="Selects the rule A_TC3 and three colours">A_TC3 · 5-cycle</option><option value="atc3tree" title="Selects the rule A_TC3 and three colours">A_TC3 · binary tree</option><option value="ac4fig2a" title="Selects the rule A_C4 and four colours">A_C4 · bridge + 4-cycle</option><option value="ac4fig2b" title="Selects the rule A_C4 and four colours">A_C4 · K3,2</option><option value="aus5k4" title="Selects the rule A_US5 and five colours">A_US5 · K4</option><option value="aus5k4tail" title="Selects the rule A_US5 and five colours">A_US5 · K4 with a tail</option><option value="a2path" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · path</option><option value="a2diamond" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · diamond</option><option value="a2k4" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · K4</option><option value="a2sketch1" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · Sketch I</option><option value="a4path" title="Selects two agents, the rule A_2x4 and four colours">A_2x4 · two agents · path</option><option value="a4rich" title="Selects two agents, the rule A_2x4 and four colours">A_2x4 · two agents · triangle with two leaves</option><option value="a4diamond" title="Selects two agents, the rule A_2x4 and four colours">A_2x4 · two agents · diamond</option><option value="a4wheel" title="Selects two agents, the rule A_2x4 and four colours">A_2x4 · two agents · wheel</option><option value="clear">empty canvas</option></select></div>
   <div class="group" style="flex-wrap:wrap"><label for="rn">random graph</label><input type="number" id="rn" value="10" min="2" max="32" step="1" style="width:64px" title="How many vertices: 2 to 32"><select id="rfam" aria-label="family of graph" style="max-width:200px" title="Which family of graph to generate. In brackets: the first algorithm of the papers that is guaranteed to explore it; the algorithms with more colours (A_TC3, A_C4, A_US5, A_Gen6) are guaranteed too."><option value="any" selected>any connected graph (A_Gen6)</option><option value="ktf">clique / triangle-free blocks (A_US5)</option><option value="cb">cycle / K(p,q) blocks (A_C4)</option><option value="cactus">cactus (A_C4)</option><option value="tree">tree (A_TC3)</option><option value="cycle">simple cycle (A_TC3)</option></select><button type="button" id="b-random" title="Replace the canvas with a new random graph of this family and size">Generate</button></div>
   <div class="group"><button type="button" id="b-import-graph">Import / export graph</button></div>
   <div class="group small" id="wasm-status">loading engine…</div>
@@ -123,16 +123,12 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
 
     <section class="panel" id="panel-rules">
       <div id="rules-two" hidden>
-        <h2>Two agents: A_2x5</h2>
-        <p class="note">With two agents the rule is built in: <b>A_2x5</b>, five colours (init, path, neigh, fin, head). Tables and code are for one agent; switch “agents” back to 1 to use them (they are kept).</p>
+        <h2>Two agents</h2>
+        <div class="row"><label class="small" for="two-rule">rule</label><select id="two-rule" title="The built-in rule the two agents run"><option value="a2c5">A_2x5 · take turns · five colours</option><option value="a2c4">A_2x4 · act together · four colours</option></select></div>
+        <p class="note" id="two-intro"></p>
         <h2>The model</h2>
-        <ul class="note">
-          <li>Both agents start on the start vertex, every vertex white (init). They are identical and oblivious.</li>
-          <li>Each sees its own vertex colour, whether the other agent is on that vertex, and for every neighbour its colour and whether the other agent is there. It may ask to move to a neighbour of a colour, to the neighbour that holds the other agent, to stay, to stop, or to wait.</li>
-          <li>The scheduler activates one agent at a time and is fair; the adversary also chooses the destination among equal candidates. (If the adversary could activate both at once, identical agents would be no better than one: the adversary can always send them to the same place.)</li>
-          <li>The agents explore when every vertex is visited and both have stopped on the start vertex.</li>
-        </ul>
-        <h2>The 21 rules</h2>
+        <ul class="note" id="two-model"></ul>
+        <h2 id="two-rules-h"></h2>
         <table id="two-rules"><thead><tr><th>rule</th><th>what it does</th></tr></thead><tbody></tbody></table>
       </div>
       <div id="rules-one">
@@ -200,6 +196,11 @@ const WASM_B64 = null; /* build.sh inlines the engine here for the standalone pa
 'use strict';
 const $ = (s) => document.querySelector(s);
 const PAL = ['var(--c0)', 'var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)'];
+// An algorithm may choose its own colours by name: A_2x4 (colours init, head, path, fin) draws the path red and the fin green; `white` lists the
+// colours whose vertex letter is white.  Every other rule keeps the palette above, by colour number.
+const ALGO_PAL = { a2c4: { colours: ['var(--c0)', 'var(--c1)', 'var(--cred)', 'var(--cgreen)'], white: [2, 3] } };
+function palOf(c) { const a = activeAlgo(), p = a && ALGO_PAL[a]; return (p && p.colours[c]) || PAL[c]; }
+function whiteInk(c) { const a = activeAlgo(), p = a && ALGO_PAL[a]; return p ? p.white.includes(c) : c === 3 || c === 4 || c === 5; }
 const CNAME = ['white', 'colour 1', 'colour 2', 'colour 3', 'colour 4', 'colour 5'];
 
 // <page-logic> pure functions, no DOM and no state: checked by game-wasm/testdata/check_page_logic.mjs,
@@ -296,21 +297,47 @@ const A2C5_RULES = [null,
   'wait for the partner',
   'the partner is the head: follow it',
   'wait for the partner'];
+// A_2x4: a colleague's four-colour strategy for two agents that ACT TOGETHER (not a paper's): a rule reads both agents' views and both
+// agents act in the same step; eleven rules, the cases a, b, c of a rule tried in the order written, and rule 11 (stop when only fin
+// is around) checked first.  The engine numbers the cases 1-19 in the order of the sheet; the sheet's own name for each is in the tag.
+const A2C4_COLOURS = ['init', 'head', 'path', 'fin'];
+const A2C4_TAGS = [null, 'R1', 'R2', 'R3a', 'R3b', 'R3c', 'R4a', 'R4b', 'R4c', 'R5a', 'R5b', 'R6a', 'R6b', 'R6c', 'R7', 'R8', 'R9a', 'R9b', 'R10', 'R11'];
+const A2C4_RULES = [null,
+  'both agents on one init vertex: one paints it head and stays, the other moves to an init neighbour',
+  'a head vertex and an init vertex side by side: the head agent stays, the init agent paints its vertex head and moves onto its partner',
+  'both on one head vertex that has a head neighbour: one paints it path and stays, the other moves to a head neighbour (the candidate)',
+  'both on one head vertex with no head neighbour but an init one: one stays, the other moves to an init neighbour (a probe)',
+  'both on one head vertex with no head and no init neighbour: both paint it path (a dead end)',
+  'a path vertex and a head vertex side by side, the head vertex has no other init neighbour: the head vertex becomes fin',
+  'a path vertex and a head vertex side by side, the head vertex touches another path vertex: reject it; the head agent moves onto its partner and the vertex stays head (a mark)',
+  'a path vertex and a head vertex side by side, the head vertex touches no other path vertex: accept it; the path agent moves onto its partner',
+  'both on one path vertex that has an init neighbour: one stays, the other moves to an init neighbour (scan)',
+  'both on one path vertex with no init neighbour: back up; one paints it fin and stays, the other moves to a path neighbour',
+  'a path vertex and an init vertex side by side, the init vertex has no other init neighbour: it becomes fin',
+  'a path vertex and an init vertex side by side, the init vertex touches another path vertex: reject it; it becomes head (a mark) and its agent moves back to its partner',
+  'a path vertex and an init vertex side by side, the init vertex touches no other path vertex: it becomes head (the candidate) and its agent stays',
+  'a path vertex and a fin vertex side by side: the path vertex becomes fin and the fin vertex becomes init',
+  'a fin vertex and an init vertex side by side: the init vertex becomes fin and its agent moves onto its partner',
+  'both on one fin vertex that has a head neighbour: one stays, the other moves to a head neighbour (clean up a mark)',
+  'both on one fin vertex with no head neighbour: both paint it head',
+  'a fin vertex and a head vertex side by side: the head vertex becomes init and its agent moves onto its partner',
+  'both on one vertex of any colour with only fin around (checked before all the others): both paint it fin and stop'];
 // By key (the name used in requests, `default NAME`): the colour names, the rule descriptions and the letter the paper puts
-// before a rule number (none for A_Gen6; T for the two-agent A_2x5).
+// before a rule number (none for A_Gen6; T for the two-agent A_2x5; R for A_2x4, whose cases are named by `tags`).
 const PAPER_ALGOS = {
   agen6: { colours: AGEN6_COLOURS, rules: AGEN6_RULES, prefix: '' },
   atc3: { colours: ATC3_COLOURS, rules: ATC3_RULES, prefix: 'D' },
   ac4: { colours: AC4_COLOURS, rules: AC4_RULES, prefix: 'C' },
   aus5: { colours: AUS5_COLOURS, rules: AUS5_RULES, prefix: 'U' },
-  a2c5: { colours: A2C5_COLOURS, rules: A2C5_RULES, prefix: 'T' }, // two agents
+  a2c5: { colours: A2C5_COLOURS, rules: A2C5_RULES, prefix: 'T' }, // two agents, taking turns
+  a2c4: { colours: A2C4_COLOURS, rules: A2C4_RULES, prefix: 'R', tags: A2C4_TAGS }, // two agents, acting together
 };
 function paperAlgo(key) { return Object.prototype.hasOwnProperty.call(PAPER_ALGOS, key) ? PAPER_ALGOS[key] : null; }
 // The label of colour c: its name when the algorithm in use names its colours (a colour beyond its list is unused), else
 // white / colour c.
 function colourLabel(c, algo) { const a = paperAlgo(algo); return a ? a.colours[c] || 'unused' : c === 0 ? 'white' : 'colour ' + c; }
 // The tag of rule n in the ledger: D5, C9, U2 for the rules of Hiraoka et al., r5 for A_Gen6 and for numbers given by code.
-function ruleTag(algo, n) { const a = paperAlgo(algo); return a && a.prefix ? a.prefix + n : 'r' + n; }
+function ruleTag(algo, n) { const a = paperAlgo(algo); return a && a.tags && a.tags[n] ? a.tags[n] : a && a.prefix ? a.prefix + n : 'r' + n; }
 // "a" or "an" before the colour name word ("an init neighbour", "a head neighbour").
 function article(word) { return /^[aeiou]/i.test(word) ? 'an' : 'a'; }
 // What rule n of the algorithm does (null if it has no description).
@@ -337,7 +364,7 @@ function paperStatus(v) {
 // papers exactly their number (more colours are left unused), some built-in rules at least so many; the other rules
 // work with any number and are not listed.
 const COLOUR_NEED = {
-  a2c5: { n: 5, exact: true, name: 'A_2x5' },
+  a2c5: { n: 5, exact: true, name: 'A_2x5' }, a2c4: { n: 4, exact: true, name: 'A_2x4' },
   agen6: { n: 6, exact: true, name: 'A_Gen6' },
   atc3: { n: 3, exact: true, name: 'A_TC3' }, ac4: { n: 4, exact: true, name: 'A_C4' }, aus5: { n: 5, exact: true, name: 'A_US5' },
   flipsweep4: { n: 4, name: 'flipsweep4' }, flipsweep4b: { n: 4, name: 'flipsweep4b' },
@@ -582,6 +609,7 @@ function runInWorker(text) { return new Promise(async (res) => { await workerRea
 const state = {
   k: 5, nodes: [], edges: [], start: 0, mode: 'node', edgeFrom: null, drag: null,
   agents: 1, back: null, // agents: 1 or 2; back: the one-agent colours, rule and code, kept while two agents are chosen
+  twoRule: 'a2c5',       // the built-in rule two agents run: a2c5 (take turns) or a2c4 (act together); state.def holds it while agents is 2
   table: new Map(), // rowText -> {paint, target}
   def: 'none', sweep: [0, 4, 0],
   algo: null, // {src, table: Map, maxDeg, errors}
@@ -617,6 +645,12 @@ PRESETS.a2path = { text: '3 0 0-1,1-2', k: 5, def: 'a2c5', agents: 2, coords: [[
 PRESETS.a2diamond = { text: '4 2 0-1,0-2,0-3,1-2,1-3', k: 5, def: 'a2c5', agents: 2, coords: [[500,170],[500,470],[200,320],[800,320]], box: [1000, 640] };
 PRESETS.a2k4 = { text: '4 0 0-1,0-2,0-3,1-2,1-3,2-3', k: 5, def: 'a2c5', agents: 2, coords: [[300,170],[700,170],[700,470],[300,470]], box: [1000, 640] };
 PRESETS.a2sketch1 = { ...PRESETS.sketch1, k: 5, def: 'a2c5', agents: 2 };
+// A_2x4, two agents acting together, four colours: the path, the triangle with two leaves (the run that uses the most rules), the diamond
+// from a tip (the graph the older 21-rule sheet got stuck on) and the wheel on five vertices (every case of the sheet fires on it).
+PRESETS.a4path = { text: '3 0 0-1,1-2', k: 4, def: 'a2c4', agents: 2, coords: [[200,320],[500,320],[800,320]], box: [1000, 640] };
+PRESETS.a4rich = { text: '5 2 0-1,0-2,0-4,1-2,1-3', k: 4, def: 'a2c4', agents: 2, coords: [[330,250],[670,250],[500,470],[880,170],[120,170]], box: [1000, 640] };
+PRESETS.a4diamond = { text: '4 2 0-1,0-2,0-3,1-2,1-3', k: 4, def: 'a2c4', agents: 2, coords: [[500,170],[500,470],[200,320],[800,320]], box: [1000, 640] };
+PRESETS.a4wheel = { text: '5 4 0-1,0-2,0-3,0-4,1-3,1-4,2-3,2-4', k: 4, def: 'a2c4', agents: 2, coords: [[500,320],[500,110],[500,530],[760,320],[240,320]], box: [1000, 640] };
 
 function graphText() { return `${state.nodes.length} ${state.start} ${state.edges.map(([u, v]) => u + '-' + v).join(',')}`; }
 function adjOf(v) { const out = []; for (const [a, b] of state.edges) { if (a === v) out.push(b); else if (b === v) out.push(a); } return out; }
@@ -929,8 +963,8 @@ function usesStop() {
 }
 function defaultName() { return state.def === 'sweep' ? `sweep:${state.sweep.join(',')}` : state.def; }
 function requestText(cmd, extra) {
-  if (state.agents === 2) { // two agents: the built-in rule A_2x5, no table, always the paper model
-    let s = `cmd ${cmd}\nagents 2\nk ${state.k}\ngraph ${graphText()}\ndefault a2c5\n`;
+  if (state.agents === 2) { // two agents: a built-in rule (A_2x5 or A_2x4, state.def), no table, always the paper model
+    let s = `cmd ${cmd}\nagents 2\nk ${state.k}\ngraph ${graphText()}\ndefault ${state.def}\n`;
     for (const [key, val] of Object.entries(extra || {})) s += `${key} ${val}\n`;
     return s;
   }
@@ -944,17 +978,17 @@ function requestText(cmd, extra) {
 // it, - not next door.  The chips show the own colour and the neighbours (the partner's vertex included), then the partner.
 function bagChips(rowText) {
   const [main, partner] = rowText.split('@');
-  const [own, bag] = main.split('.'); let s = `<span class="chips" title="own colour"><i style="background:${PAL[+own]}"></i></span> · <span class="chips" title="neighbours">`;
-  for (let c = 0; c < bag.length; c++) for (let j = 0; j < parseInt(bag[c], 16); j++) s += `<i style="background:${PAL[c]}"></i>`;
+  const [own, bag] = main.split('.'); let s = `<span class="chips" title="own colour"><i style="background:${palOf(+own)}"></i></span> · <span class="chips" title="neighbours">`;
+  for (let c = 0; c < bag.length; c++) for (let j = 0; j < parseInt(bag[c], 16); j++) s += `<i style="background:${palOf(c)}"></i>`;
   s += '</span>';
-  if (partner !== undefined) s += partner === 'h' ? ' · <span class="small" title="the other agent is on this vertex">partner here</span>' : partner === '-' ? ' · <span class="small" title="the other agent is not on a neighbour">partner away</span>' : ` · <span class="chips" title="the other agent is on a neighbour of this colour"><i style="background:${PAL[+partner]}"></i></span><span class="small"> partner</span>`;
+  if (partner !== undefined) s += partner === 'h' ? ' · <span class="small" title="the other agent is on this vertex">partner here</span>' : partner === '-' ? ' · <span class="small" title="the other agent is not on a neighbour">partner away</span>' : ` · <span class="chips" title="the other agent is on a neighbour of this colour"><i style="background:${palOf(+partner)}"></i></span><span class="small"> partner</span>`;
   return s;
 }
 
 // ------------------------------------------------------------ persistence (per-browser convenience only)
-function save() { state.tableStops = undefined; try { localStorage.setItem('cew.state', JSON.stringify({ k: state.k, nodes: state.nodes, edges: state.edges, start: state.start, table: [...state.table.entries()], def: state.def, sweep: state.sweep, algoSrc: state.algoSrc, agents: state.agents, back: state.back })); } catch (e) { /* storage unavailable */ } }
+function save() { state.tableStops = undefined; try { localStorage.setItem('cew.state', JSON.stringify({ k: state.k, nodes: state.nodes, edges: state.edges, start: state.start, table: [...state.table.entries()], def: state.def, sweep: state.sweep, algoSrc: state.algoSrc, agents: state.agents, back: state.back, twoRule: state.twoRule })); } catch (e) { /* storage unavailable */ } }
 function restore() {
-  try { const s = JSON.parse(localStorage.getItem('cew.state') || 'null'); if (!s || !s.nodes || !s.nodes.length) return false; state.k = s.k || 5; state.nodes = s.nodes; state.edges = s.edges || []; state.start = s.start || 0; state.table = new Map(s.table || []); state.def = s.def || 'none'; state.sweep = s.sweep || [0, 4, 0]; state.algoSrc = s.algoSrc || ''; state.agents = s.agents === 2 ? 2 : 1; state.back = s.back || null; if (state.agents === 2) { state.def = 'a2c5'; state.algoSrc = ''; } return true; } catch (e) { return false; }
+  try { const s = JSON.parse(localStorage.getItem('cew.state') || 'null'); if (!s || !s.nodes || !s.nodes.length) return false; state.k = s.k || 5; state.nodes = s.nodes; state.edges = s.edges || []; state.start = s.start || 0; state.table = new Map(s.table || []); state.def = s.def || 'none'; state.sweep = s.sweep || [0, 4, 0]; state.algoSrc = s.algoSrc || ''; state.agents = s.agents === 2 ? 2 : 1; state.back = s.back || null; state.twoRule = s.twoRule === 'a2c4' ? 'a2c4' : 'a2c5'; if (state.agents === 2) { state.def = state.twoRule; state.algoSrc = ''; } return true; } catch (e) { return false; }
 }
 
 // ------------------------------------------------------------ play
@@ -983,7 +1017,12 @@ function computePending() {
   if (r.status !== 'ok') { p.done = { kind: 'error', message: r.message }; return; }
   if (two) { // the engine names the agent that acts (agent 0 = A when both could), or says that neither can
     if (r.stuck) { p.done = { kind: 'stuck', unvisited: unvisited() }; return; }
-    if (!r.defined) { p.done = { kind: 'error', message: `A_2x5 has no rule for the row ${r.row}` }; return; }
+    if (r.joint) { // A_2x4: one rule for the pair, both agents act in this step; the adversary picks the destination of the one that moves to a colour
+      const st = r.step, acts = [st, st.second].map((x) => ({ agent: x.agent, cur: x.cur, other: x.other, row: x.row, paint: x.paint, paints: x.paints !== false, target: x.target, options: x.options }));
+      p.pending = { joint: true, agent: st.agent, row: st.row, paint: st.paint, target: st.target, options: r.choose, auto: r.auto, acts, source: 'built-in', rule: Number.isInteger(r.rule) ? r.rule : null };
+      return;
+    }
+    if (!r.defined) { p.done = { kind: 'error', message: `${COLOUR_NEED[state.def].name} has no rule for the row ${r.row}` }; return; }
     p.pending = { agent: r.agent, row: r.row, paint: r.paint, target: r.target, options: r.options, auto: r.auto, source: 'built-in', rule: Number.isInteger(r.rule) ? r.rule : null };
     return;
   }
@@ -993,9 +1032,26 @@ function computePending() {
   const rule = Number.isInteger(r.rule) ? r.rule : entry && Number.isInteger(entry.rule) ? entry.rule : null; // the paper's rule number, for rules that have them
   p.pending = { row: r.row, paint: r.paint, target: r.target, options: r.options, auto: r.auto, source, rule };
 }
+// A_2x4: both agents act in one step.  Each role paints its vertex (unless it only moves) and stays, moves onto its partner, moves to a
+// vertex of a colour (the adversary's choice, for the one role that does) or stops; positions are those from before the step.
+function applyJoint(choice) {
+  const p = state.play, pd = p.pending;
+  p.history.push({ colours: p.colours.slice(), cur: p.cur, cur2: p.cur2, term: p.term.slice(), vis: new Set(p.vis), steps: p.steps.length, seen: p.seen.size, lastEdge: p.lastEdge });
+  const roles = pd.acts.map((a) => ({ ...a, next: a.target === -4 ? a.other : a.target >= 0 ? choice : null }));
+  p.steps.push({ ...roles[0], source: pd.source, rule: pd.rule, second: roles[1] });
+  p.lastEdge = null;
+  for (const r of roles) {
+    if (r.paints) p.colours[r.cur] = r.paint;
+    if (r.target === -2) p.term[r.agent] = true;
+    if (r.next !== null && r.next !== undefined) { p.lastEdge = [r.cur, r.next]; if (r.agent === 0) p.cur = r.next; else p.cur2 = r.next; p.vis.add(r.next); }
+  }
+  state.defining = null;
+  computePending();
+}
 // Two agents: the agent that the engine named acts; it paints the vertex it stands on and moves, stays or stops.
 function applyChoice2(choice) {
   const p = state.play, pd = p.pending; if (!pd) return;
+  if (pd.joint) { applyJoint(choice); return; }
   const ag = pd.agent, pos = ag === 0 ? p.cur : p.cur2, other = ag === 0 ? p.cur2 : p.cur;
   p.history.push({ colours: p.colours.slice(), cur: p.cur, cur2: p.cur2, term: p.term.slice(), vis: new Set(p.vis), steps: p.steps.length, seen: p.seen.size, lastEdge: p.lastEdge });
   p.steps.push({ agent: ag, cur: pos, other, row: pd.row, paint: pd.paint, target: pd.target, options: pd.options, next: choice, source: pd.source, rule: pd.rule });
@@ -1034,7 +1090,8 @@ function stepOnce(auto) {
   if (rp && rp.index < rp.steps.length) { // follow a loaded execution
     const st = rp.steps[rp.index]; rp.index++;
     if (st.row !== p.pending.row) { rp.diverged = true; }
-    applyChoice(st.next === null ? null : st.next); return;
+    const mover = st.second ? [st, st.second].find((x) => x.target >= 0) : st; // a joint step: the role that moves to a colour made the choice
+    applyChoice(!mover || mover.next === null ? null : mover.next); return;
   }
   const opts = p.pending.options;
   if (opts.length === 0) { applyChoice(null); return; }
@@ -1087,22 +1144,28 @@ function renderColourHint() {
   const h = colourHint(rule, state.k), el = $('#khint');
   el.textContent = h ? h.text : ''; el.className = 'khint' + (h && h.warn ? ' warn' : '');
 }
-function renderAgentHint() { $('#agents').value = String(state.agents); $('#ahint').textContent = state.agents === 2 ? 'two agents see each other' : ''; }
+function renderAgentHint() { $('#agents').value = String(state.agents); $('#ahint').textContent = state.agents === 2 ? (state.def === 'a2c4' ? 'two agents act together' : 'two agents see each other') : ''; }
 function render() { renderGraph(); renderPlay(); renderRules(); renderLegend(); renderHint(); renderColourHint(); renderAgentHint(); }
-// One agent or two.  Choosing two brings the rule A_2x5 and five colours and keeps the one-agent colours, rule and code to give back
+// One agent or two.  Choosing two brings the rule two agents ran last (A_2x5 by default, A_2x4 if chosen) and its colours, and keeps the one-agent colours, rule and code to give back
 // when one agent is chosen again (a table is not used with two agents, and is not touched).  Callers reset the play and redraw.
 function applyAgents(n) {
   if (n === state.agents) return;
   if (n === 2) {
     state.back = { k: state.k, def: state.def, algoSrc: state.algoSrc };
-    state.agents = 2; state.def = 'a2c5'; state.algoSrc = ''; state.algo = null; state.algoError = null;
-    if (state.k < 5) state.k = 5;
+    state.agents = 2; state.def = state.twoRule; state.algoSrc = ''; state.algo = null; state.algoError = null;
+    if (state.k < COLOUR_NEED[state.def].n) state.k = COLOUR_NEED[state.def].n;
   } else {
     const b = state.back; state.back = null; state.agents = 1;
-    state.def = b && b.def !== 'a2c5' ? b.def : 'none'; state.algoSrc = b ? b.algoSrc : ''; state.algo = null; state.algoError = null;
+    state.def = b && b.def !== 'a2c5' && b.def !== 'a2c4' ? b.def : 'none'; state.algoSrc = b ? b.algoSrc : ''; state.algo = null; state.algoError = null;
     if (b) state.k = b.k;
   }
   $('#k').value = state.k; $('#agents').value = String(state.agents);
+}
+// The rule two agents run: A_2x5 (take turns, five colours) or A_2x4 (act together, four colours); it brings its number of colours.
+// Callers reset the play and redraw.
+function setTwoRule(rule) {
+  state.twoRule = rule; if (state.agents === 2) state.def = rule;
+  state.k = COLOUR_NEED[rule].n; $('#k').value = state.k;
 }
 // The algorithm of the papers in use, or null: it names its colours (init, path, ...) and numbers its rules.  Code in use
 // answers before the fallback, so its colours are an algorithm's only if it is that algorithm's template.
@@ -1112,7 +1175,7 @@ function activeAlgo() {
 }
 function namedColours() { return activeAlgo() !== null; }
 function cname(c) { return colourLabel(c, activeAlgo()); }
-function renderLegend() { $('#legend').innerHTML = [...Array(state.k).keys()].map((c) => `<span><span class="sw" style="background:${PAL[c]}"></span>${namedColours() ? cname(c) : c === 0 ? 'white' : c}</span>`).join('') + (state.agents === 2 ? '<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent A (works)</span><span><span class="sw" style="border:3px solid var(--warn);width:10px;height:10px"></span>agent B (marks, follows)</span>' : '<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent</span>') + '<span><span class="sw" style="border:2px dashed var(--bad)"></span>never visited</span>'; }
+function renderLegend() { $('#legend').innerHTML = [...Array(state.k).keys()].map((c) => `<span><span class="sw" style="background:${palOf(c)}"></span>${namedColours() ? cname(c) : c === 0 ? 'white' : c}</span>`).join('') + (state.agents === 2 ? `<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent A${state.def === 'a2c4' ? '' : ' (works)'}</span><span><span class="sw" style="border:3px solid var(--warn);width:10px;height:10px"></span>agent B${state.def === 'a2c4' ? ' (both act in every step)' : ' (marks, follows)'}</span>` :'<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent</span>') + '<span><span class="sw" style="border:2px dashed var(--bad)"></span>never visited</span>'; }
 function renderHint() {
   const h = { node: 'Click on empty space to add a vertex.', edge: state.edgeFrom === null ? 'Click a vertex, then another, to join them.' : `Now click the vertex to join with ${state.edgeFrom} (click it again to cancel).`, move: 'Drag vertices to arrange the drawing.', delete: 'Click a vertex or an edge to remove it.', start: 'Click the vertex where the agent starts.' }[state.mode];
   $('#hint').textContent = h;
@@ -1143,8 +1206,8 @@ function renderGraph() {
     }
     if (unv.has(i)) s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r * 1.5}" fill="none" style="stroke:var(--bad)" stroke-width="3" stroke-dasharray="6 5"/>`;
     if (state.edgeFrom === i) s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r * 1.35}" fill="none" style="stroke:var(--warn)" stroke-width="3"/>`;
-    s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r}" style="fill:${PAL[col]};stroke:var(--ink)" stroke-width="2.5"/>`;
-    s += `<text x="${nd.x}" y="${nd.y}" dy=".35em" text-anchor="middle" style="font-family:var(--mono);font-weight:600;font-size:14px;pointer-events:none" fill="${col === 3 || col === 4 || col === 5 ? '#fff' : '#241f45'}">${NAMES(i)}</text>`;
+    s += `<circle cx="${nd.x}" cy="${nd.y}" r="${r}" style="fill:${palOf(col)};stroke:var(--ink)" stroke-width="2.5"/>`;
+    s += `<text x="${nd.x}" y="${nd.y}" dy=".35em" text-anchor="middle" style="font-family:var(--mono);font-weight:600;font-size:14px;pointer-events:none" fill="${whiteInk(col) ? '#fff' : '#241f45'}">${NAMES(i)}</text>`;
     // above the halo (1.9 r), the largest thing drawn around a vertex, so the agent's ring (1.5 r) never crosses the label;
     // but not above the top of the canvas, where it would be cut off
     if (i === state.start) s += `<text x="${nd.x}" y="${Math.max(nd.y - r * 1.9 - 4, 11)}" text-anchor="middle" style="font-size:11px;fill:var(--soft);pointer-events:none">start</text>`;
@@ -1179,13 +1242,19 @@ function pillsHtml(p) {
 function stoppedBanner(p) {
   const ps = playPaperStatus(p), steps = p.steps.length, unv = p.done.unvisited;
   if (state.agents === 2) {
-    if (ps.outcome === 'explores') return `<div class="banner good"><b>Explored in this play (paper model).</b> Every vertex was visited and both agents stopped on the start vertex ${NAMES(state.start)} after ${steps} steps. These are this play's choices; the Analysis tab checks every adversary, including which agent is activated.</div>`;
+    if (ps.outcome === 'explores') return `<div class="banner good"><b>Explored in this play (paper model).</b> Every vertex was visited and both agents stopped on the start vertex ${NAMES(state.start)} after ${steps} steps. These are this play's choices; the Analysis tab checks every adversary${state.def === 'a2c4' ? '' : ', including which agent is activated'}.</div>`;
     if (ps.outcome === 'stopped_early') return `<div class="banner bad"><b>Stopped early in this play.</b> Both agents stopped (A on ${NAMES(p.cur)}, B on ${NAMES(p.cur2)}) after ${steps} steps, but <b>${unv.map(NAMES).join(', ')}</b> ${unv.length === 1 ? 'was' : 'were'} never visited.</div>`;
     return `<div class="banner bad"><b>Stopped away from the start in this play.</b> Every vertex was visited, but the agents stopped on ${NAMES(p.cur)} and ${NAMES(p.cur2)}, not both on the start vertex ${NAMES(state.start)}.</div>`;
   }
   if (ps.outcome === 'explores') return `<div class="banner good"><b>Explored in this play (paper model).</b> Every vertex was visited and the agent stopped on the start vertex ${NAMES(state.start)} after ${steps} steps. These are this play's choices; the Analysis tab checks every adversary.</div>`;
   if (ps.outcome === 'stopped_early') return `<div class="banner bad"><b>Stopped early in this play.</b> The agent stopped on ${NAMES(p.cur)} after ${steps} steps, but <b>${unv.map(NAMES).join(', ')}</b> ${unv.length === 1 ? 'was' : 'were'} never visited.</div>`;
   return `<div class="banner bad"><b>Stopped away from the start in this play.</b> Every vertex was visited, but the agent stopped on ${NAMES(p.cur)}, not on the start vertex ${NAMES(state.start)}.</div>`;
+}
+// What an action does, in words: `paints colour, then ...` (a role that only moves does not paint) and stays, stops, goes to the partner or to a colour.
+// a: { paint, paints, target, options }; paints is absent (true) for the actions of the one-agent rules and of A_2x5.
+function actionWords(a) {
+  const go = a.target === -2 ? '<b>stops</b> (paper model)' : a.target === -1 ? 'stays' : a.target === -4 ? (a.options.length ? 'moves to its <b>partner</b>' : 'its partner is not next door: stays') : a.options.length === 0 ? `no ${cname(a.target)} neighbour: stays` : `moves to ${article(cname(a.target))} <b>${cname(a.target)}</b> neighbour`;
+  return a.paints === false ? go : `paints <span class="sw" style="background:${palOf(a.paint)}"></span>${cname(a.paint)}, then ${go}`;
 }
 function renderPlay() {
   const p = state.play, box = $('#playstatus');
@@ -1200,9 +1269,16 @@ function renderPlay() {
       <p class="note">The row goes into the table (Rules tab) and the play resumes.</p>`;
   } else if (p.pending) {
     const pd = p.pending;
-    s += `<div class="row small">${two ? `<b>agent ${who(pd.agent)}</b> ` : ''}reads <span class="mono">${pd.row}</span> ${bagChips(pd.row)} <span style="color:var(--soft)">(${pd.source}${pd.rule ? ` · rule ${ruleTag(activeAlgo(), pd.rule).replace(/^r/, '')}` : ''})</span></div>`;
-    if (pd.rule && ruleText(activeAlgo(), pd.rule)) s += `<div class="row small note">rule ${ruleTag(activeAlgo(), pd.rule).replace(/^r/, '')}: ${ruleText(activeAlgo(), pd.rule)}</div>`;
-    s += `<div class="row small">paints <span class="sw" style="background:${PAL[pd.paint]}"></span>${cname(pd.paint)}, then ${pd.target === -2 ? '<b>stops</b> (paper model)' : pd.target === -1 ? 'stays' : pd.target === -4 ? (pd.options.length ? 'moves to its <b>partner</b>' : 'its partner is not next door: stays') : pd.options.length === 0 ? `no ${cname(pd.target)} neighbour: stays` : `moves to ${article(cname(pd.target))} <b>${cname(pd.target)}</b> neighbour`}</div>`;
+    if (pd.joint) { // A_2x4: one rule for the pair, both agents read and act in this step
+      const tag = ruleTag(activeAlgo(), pd.rule);
+      s += `<div class="row small"><b>both agents act</b> <span style="color:var(--soft)">(${pd.source} · rule ${tag})</span></div>`;
+      if (ruleText(activeAlgo(), pd.rule)) s += `<div class="row small note">rule ${tag}: ${ruleText(activeAlgo(), pd.rule)}</div>`;
+      for (const a of pd.acts) s += `<div class="row small"><b>agent ${who(a.agent)}</b> at ${NAMES(a.cur)} reads <span class="mono">${a.row}</span> ${bagChips(a.row)} ${actionWords(a)}</div>`;
+    } else {
+      s += `<div class="row small">${two ? `<b>agent ${who(pd.agent)}</b> ` : ''}reads <span class="mono">${pd.row}</span> ${bagChips(pd.row)} <span style="color:var(--soft)">(${pd.source}${pd.rule ? ` · rule ${ruleTag(activeAlgo(), pd.rule).replace(/^r/, '')}` : ''})</span></div>`;
+      if (pd.rule && ruleText(activeAlgo(), pd.rule)) s += `<div class="row small note">rule ${ruleTag(activeAlgo(), pd.rule).replace(/^r/, '')}: ${ruleText(activeAlgo(), pd.rule)}</div>`;
+      s += `<div class="row small">${actionWords(pd)}</div>`;
+    }
     if (pd.options.length) s += `<div class="row small">adversary may serve: ${pd.options.map((u) => `<b>${NAMES(u)}</b>`).join(', ')}${pd.options.length >= 2 ? ` · auto would pick <b>${NAMES(pd.auto)}</b>` : ''}</div>`;
     if (pd.options.length >= 2 && !(state.replay && state.replay.index < state.replay.steps.length)) s += `<div class="banner neutral" id="choicehint">Your move as the adversary: click a highlighted vertex (or Auto step).</div>`;
   } else if (p.done) {
@@ -1217,8 +1293,11 @@ function renderPlay() {
   box.innerHTML = s;
   const tb = $('#ledger tbody'); let rows = '';
   const cycFrom = p.done && p.done.kind === 'confined' ? p.done.repeatAt : (state.replay && state.replay.index >= state.replay.steps.length ? state.replay.repeatAt : null);
+  // a step of A_2x4 has two rows (both agents act): the second role is in st.second, with the step number and the rule tag shown once
+  const ledgerRow = (i, st, second) => `<tr class="${cycFrom !== null && cycFrom !== undefined && i >= cycFrom ? 'cycle' : ''}"><td class="mono">${second ? '' : i}</td><td>${st.agent !== undefined ? `<b>${who(st.agent)}</b> ` : ''}<b>${NAMES(st.cur)}</b></td><td><span class="mono">${st.row}</span> ${bagChips(st.row)}${st.rule && !second ? ` <span class="small" title="${ruleText(activeAlgo(), st.rule) || 'rule ' + st.rule}">· ${ruleTag(activeAlgo(), st.rule)}</span>` : ''}</td><td>${st.paints === false ? '' : `<span class="sw" style="background:${palOf(st.paint)}"></span>`}${st.target === -1 ? 'stay' : st.target === -2 ? '■ stop' : st.target === -3 ? 'wait' : st.target === -4 ? '→ partner' : '→ ' + cname(st.target)}</td><td>${st.options.map(NAMES).join(', ') || '—'}</td><td>${st.next === null ? (st.target === -2 ? 'stops' : 'stays') : `<b>${NAMES(st.next)}</b>${st.options.length >= 2 ? ' ◆' : ''}`}</td></tr>`;
   p.steps.forEach((st, i) => {
-    rows += `<tr class="${cycFrom !== null && cycFrom !== undefined && i >= cycFrom ? 'cycle' : ''}"><td class="mono">${i}</td><td>${st.agent !== undefined ? `<b>${who(st.agent)}</b> ` : ''}<b>${NAMES(st.cur)}</b></td><td><span class="mono">${st.row}</span> ${bagChips(st.row)}${st.rule ? ` <span class="small" title="${ruleText(activeAlgo(), st.rule) || 'rule ' + st.rule}">· ${ruleTag(activeAlgo(), st.rule)}</span>` : ''}</td><td><span class="sw" style="background:${PAL[st.paint]}"></span>${st.target === -1 ? 'stay' : st.target === -2 ? '■ stop' : st.target === -3 ? 'wait' : st.target === -4 ? '→ partner' : '→ ' + cname(st.target)}</td><td>${st.options.map(NAMES).join(', ') || '—'}</td><td>${st.next === null ? (st.target === -2 ? 'stops' : 'stays') : `<b>${NAMES(st.next)}</b>${st.options.length >= 2 ? ' ◆' : ''}`}</td></tr>`;
+    rows += ledgerRow(i, st, false);
+    if (st.second) rows += ledgerRow(i, st.second, true);
   });
   // follow the newest step inside the ledger's own box, but only if it was already at the bottom (not while you read
   // older rows), and never scroll the panel or the page: scrollIntoView on the last row did that at every step
@@ -1230,10 +1309,29 @@ function renderPlay() {
   $('#b-step').disabled = !!p.done; $('#b-auto').disabled = !!p.done; $('#b-play').disabled = !!p.done;
 }
 function colourOptions(withStay) { let s = ''; for (let c = 0; c < state.k; c++) s += `<option value="${c}">${namedColours() ? c + ' ' + cname(c) : c === 0 ? '0 white' : c}</option>`; if (withStay) s += '<option value="-1">stay</option><option value="-2">stop (paper model)</option>'; return s; }
+// The Rules tab with two agents: the rule in use (A_2x5 or A_2x4), its model and its rules.
+function renderTwoRules() {
+  const joint = state.def === 'a2c4', a = paperAlgo(state.def);
+  $('#two-rule').value = state.def;
+  $('#two-intro').innerHTML = joint
+    ? 'With two agents the rule is built in: <b>A_2x4</b>, four colours (init, head, path, fin), a colleague’s strategy (not from a paper). The two agents <b>act together</b>: one rule reads both agents’ views and both act in the same step. Tables and code are for one agent; switch “agents” back to 1 to use them (they are kept).'
+    : 'With two agents the rule is built in: <b>A_2x5</b>, five colours (init, path, neigh, fin, head). Tables and code are for one agent; switch “agents” back to 1 to use them (they are kept).';
+  $('#two-model').innerHTML = joint
+    ? `<li>Both agents start on the start vertex, every vertex white (init). They are identical and oblivious; the page names them A and B, and when they stand together A plays the first role of a rule.</li>
+       <li>A rule is about the pair: either both agents on one vertex of a colour, or one agent on a vertex of each of two colours, side by side. It also reads the colours around: some neighbour has a colour, or none has one of several (the other agent’s own vertex is left out).</li>
+       <li>One rule fires per step, the first that matches: rule 11 first, then rules 1 to 10, and inside a rule the cases a, b, c in order. Each agent then paints its vertex and stays, moves onto its partner, moves to a neighbour of a colour (the adversary picks which), or stops.</li>
+       <li>The agents explore when every vertex is visited and both have stopped on the start vertex. If the adversary could also choose which agent moves, this would be a different (turn-taking) model: that is A_2x5.</li>`
+    : `<li>Both agents start on the start vertex, every vertex white (init). They are identical and oblivious.</li>
+       <li>Each sees its own vertex colour, whether the other agent is on that vertex, and for every neighbour its colour and whether the other agent is there. It may ask to move to a neighbour of a colour, to the neighbour that holds the other agent, to stay, to stop, or to wait.</li>
+       <li>The scheduler activates one agent at a time and is fair; the adversary also chooses the destination among equal candidates. (If the adversary could activate both at once, identical agents would be no better than one: the adversary can always send them to the same place.)</li>
+       <li>The agents explore when every vertex is visited and both have stopped on the start vertex.</li>`;
+  $('#two-rules-h').textContent = joint ? 'The 11 rules (19 cases)' : 'The 21 rules';
+  $('#two-rules tbody').innerHTML = a.rules.slice(1).map((t, i) => `<tr><td class="mono">${ruleTag(state.def, i + 1)}</td><td style="white-space:normal">${t}</td></tr>`).join('');
+}
 function renderRules() {
   const two = state.agents === 2;
   $('#rules-one').hidden = two; $('#rules-two').hidden = !two;
-  if (two) $('#two-rules tbody').innerHTML = A2C5_RULES.slice(1).map((t, i) => `<tr><td class="mono">T${i + 1}</td><td style="white-space:normal">${t}</td></tr>`).join('');
+  if (two) renderTwoRules();
   $('#walks-two').hidden = !two; if (!pending.size) $('#b-walks').disabled = two; // quick walks are for one agent
   ensureAlgo();
   const ta = $('#algo'); if (document.activeElement !== ta && ta.value !== state.algoSrc) ta.value = state.algoSrc;
@@ -1273,7 +1371,7 @@ function analysisPills(r) {
 }
 function paperSummary(r) {
   const t = r.trace, steps = t.steps.length, pills = analysisPills(r), two = r.agents === 2;
-  if (r.status === 'explores') return `<div class="banner good"><b>Explores against every adversary (paper model).</b> ${r.positions.toLocaleString()} positions enumerated, none losing: every vertex is visited and ${two ? 'both agents stop' : 'the agent stops'} on the start vertex ${NAMES(t.stopped_at)}.${two ? ' The adversary chose both which agent is activated and where it goes.' : ''} The adversary can delay the stop to step ${steps} at most; that longest obstruction is loaded below.</div>${pills}`;
+  if (r.status === 'explores') return `<div class="banner good"><b>Explores against every adversary (paper model).</b> ${r.positions.toLocaleString()} positions enumerated, none losing: every vertex is visited and ${two ? 'both agents stop' : 'the agent stops'} on the start vertex ${NAMES(t.stopped_at)}.${two ? (state.def === 'a2c4' ? ' The adversary chose where every move goes.' : ' The adversary chose both which agent is activated and where it goes.') : ''} The adversary can delay the stop to step ${steps} at most; that longest obstruction is loaded below.</div>${pills}`;
   const how = r.method === 'exact game' ? `Exact game over ${r.positions.toLocaleString()} positions: the adversary has a strategy under which` : `Found by an adversary ${r.method}: under it`;
   const what = {
     never_stops: `the agent never stops (the last ${steps - t.repeat_at} of the ${steps} steps repeat for ever)`,
@@ -1354,16 +1452,27 @@ svg.addEventListener('dblclick', (evt) => { const nodeEl = evt.target.closest('.
 document.querySelectorAll('header [data-mode]').forEach((b) => b.addEventListener('click', () => { state.mode = b.dataset.mode; state.edgeFrom = null; document.querySelectorAll('header [data-mode]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); render(); }));
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 $('#k').addEventListener('change', (e) => { state.k = +e.target.value; let dropped = 0; for (const [r, a] of [...state.table.entries()]) { const own = +r.split('.')[0], bag = r.split('.')[1]; if (own >= state.k || a.paint >= state.k || a.target >= state.k || bag.length > state.k || [...bag].some((d, i) => i >= state.k && d !== '0')) { state.table.delete(r); dropped++; } } if (dropped) flash(`${dropped} table rows used colours beyond the new palette and were removed.`); save(); resetPlay(); render(); });
-$('#preset').addEventListener('change', (e) => { const v = e.target.value; e.target.value = ''; if (!v) return; if (v === 'clear') { state.nodes = []; state.edges = []; state.start = 0; forgetAnalysis(); resetPlay(); save(); render(); return; } const pr = PRESETS[v];
-  const want = pr.agents || 1; // a preset brings the number of agents it is for: two agents bring the rule A_2x5 and five colours
+$('#preset').addEventListener('change', (e) => { const v = e.target.value; e.target.value = ''; if (v) applyPreset(v); });
+function applyPreset(v) { if (v === 'clear') { state.nodes = []; state.edges = []; state.start = 0; forgetAnalysis(); resetPlay(); save(); render(); return; } const pr = PRESETS[v];
+  // With two agents chosen, a preset made for one agent (a plain graph, or an algorithm of the papers with its graph) loads its graph
+  // only: the agents, their rule and the colours stay, so the graph can be tried with them.  The rule of an algorithm preset is for
+  // one agent; a note says it was not applied.
+  if (state.agents === 2 && !pr.agents) {
+    loadGraphText(pr.text, pr.coords, pr.box);
+    if (pr.def) $('#playstatus').insertAdjacentHTML('beforeend', `<div class="banner neutral">Only the graph of this preset was loaded: ${COLOUR_NEED[pr.def] ? COLOUR_NEED[pr.def].name : pr.def} is a rule for one agent, so the two agents and their rule stay.</div>`);
+    return;
+  }
+  const want = pr.agents || 1; // a preset made for two agents brings them with their rule (A_2x5 or A_2x4) and its colours
+  if (want === 2 && pr.def) state.twoRule = pr.def;
   if (want !== state.agents) applyAgents(want);
-  if (want === 2) { state.k = pr.k; $('#k').value = pr.k; loadGraphText(pr.text, pr.coords, pr.box); return; }
+  if (want === 2) { if (pr.def) setTwoRule(pr.def); state.k = pr.k; $('#k').value = pr.k; loadGraphText(pr.text, pr.coords, pr.box); return; }
   if (pr.def) { // the preset brings its own rule: rows and code in use would win over it, so they go
     if ((state.table.size || state.algoSrc) && !confirm(`This preset uses the rule ${pr.def}. It replaces the rule you have in use (${state.table.size} defined row${state.table.size === 1 ? '' : 's'}${state.algoSrc ? ' and the algorithm' : ''}). Continue?`)) return;
     state.def = pr.def; state.table = new Map(); state.algoSrc = ''; state.algo = null; state.algoError = null;
   }
-  state.k = pr.k; $('#k').value = pr.k; loadGraphText(pr.text, pr.coords, pr.box); });
+  state.k = pr.k; $('#k').value = pr.k; loadGraphText(pr.text, pr.coords, pr.box); }
 $('#agents').addEventListener('change', (e) => { applyAgents(+e.target.value === 2 ? 2 : 1); forgetAnalysis(); save(); resetPlay(); render(); });
+$('#two-rule').addEventListener('change', (e) => { setTwoRule(e.target.value === 'a2c4' ? 'a2c4' : 'a2c5'); forgetAnalysis(); save(); resetPlay(); render(); });
 $('#b-import-graph').addEventListener('click', () => { $('#graphtext').value = graphText(); $('#graphdialog').showModal(); });
 $('#b-random').addEventListener('click', makeRandomGraph);
 $('#rn').addEventListener('keydown', (e) => { if (e.key === 'Enter') makeRandomGraph(); });

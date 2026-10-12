@@ -204,14 +204,14 @@ impl Pos2 {
     }
 }
 
-fn over(p: &Pos2) -> bool {
+pub(crate) fn over(p: &Pos2) -> bool {
     p.ta && p.tb
 }
 fn won(g: &Graph, p: &Pos2) -> bool {
     over(p) && p.a == g.s && p.b == g.s && p.vis == g.full()
 }
 
-fn observe(g: &Graph, chi: u128, me: u8, other: u8) -> Obs2 {
+pub(crate) fn observe(g: &Graph, chi: u128, me: u8, other: u8) -> Obs2 {
     let mut cnt = [[0u8; 2]; MAXK];
     for u in g.neighbours(me) {
         cnt[colour(chi, u) as usize][(u == other) as usize] += 1;
@@ -315,6 +315,45 @@ fn enabled(g: &Graph, p: &Pos2) -> Result<Option<(u8, Obs2, Action, u8)>, Obs2> 
     Ok(None)
 }
 
+// ------------------------------------------------------------------ the two schedulers
+/// Which rule the two agents run: `Turns` is `a2c5` (the adversary activates one agent per step), `Joint` is `a2c4`
+/// (a rule reads both views and both agents act in the same step; see `joint.rs`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Model {
+    Turns,
+    Joint,
+}
+
+impl Model {
+    pub fn of(rule: &str) -> Option<Model> {
+        match rule {
+            NAME => Some(Model::Turns),
+            super::joint::NAME => Some(Model::Joint),
+            _ => None,
+        }
+    }
+    pub fn name(self) -> &'static str {
+        match self {
+            Model::Turns => NAME,
+            Model::Joint => super::joint::NAME,
+        }
+    }
+    pub fn need(self) -> u8 {
+        match self {
+            Model::Turns => NEED,
+            Model::Joint => super::joint::NEED,
+        }
+    }
+}
+
+/// The positions the adversary can take the agents to from `p`.
+fn successors_pos(g: &Graph, p: &Pos2, m: Model) -> Result<Vec<Pos2>, Obs2> {
+    match m {
+        Model::Turns => Ok(successors2(g, p)?.into_iter().map(|(_, _, q)| q).collect()),
+        Model::Joint => Ok(if over(p) { vec![] } else { super::joint::successors(g, p) }),
+    }
+}
+
 // ------------------------------------------------------------------ plays and traces
 #[derive(Clone, Debug)]
 pub struct Step2 {
@@ -326,6 +365,10 @@ pub struct Step2 {
     pub rule: u8,
     pub options: Vec<u8>,
     pub next: Option<u8>,
+    /// false when the agent does not repaint its vertex in this step (a joint step: a role that only moves)
+    pub paints: bool,
+    /// a joint step: what the second role does in the same step (the first is this step itself)
+    pub second: Option<Box<Step2>>,
 }
 
 #[derive(Clone, Debug)]
@@ -360,11 +403,14 @@ fn step_from(g: &Graph, p: &Pos2, i: u8, o: &Obs2, a: Action, rule: u8, next: Op
         }
         t => g.neighbours(p.at(i)).filter(|&u| colour(p.chi, u) == t).collect(),
     };
-    Step2 { agent: i, cur: p.at(i), other: p.at(1 - i), row: o.text(NEED), act: a, rule, options, next }
+    Step2 { agent: i, cur: p.at(i), other: p.at(1 - i), row: o.text(NEED), act: a, rule, options, next, paints: true, second: None }
 }
 
 /// The step that takes `p` to `q`, one of its successors.
-fn step_between(g: &Graph, p: &Pos2, q: &Pos2) -> Step2 {
+fn step_between(g: &Graph, p: &Pos2, q: &Pos2, m: Model) -> Step2 {
+    if m == Model::Joint {
+        return super::joint::step_between(g, p, q);
+    }
     for i in 0..2u8 {
         if i == 1 && p.together() {
             continue;
@@ -380,20 +426,25 @@ fn step_between(g: &Graph, p: &Pos2, q: &Pos2) -> Step2 {
     unreachable!("q is not a successor of p")
 }
 
-fn trace_of(g: &Graph, chain: &[Pos2], repeat_at: Option<usize>) -> Trace2 {
-    let steps: Vec<Step2> = (0..chain.len().saturating_sub(1)).map(|w| step_between(g, &chain[w], &chain[w + 1])).collect();
+fn trace_of(g: &Graph, chain: &[Pos2], repeat_at: Option<usize>, m: Model) -> Trace2 {
+    let steps: Vec<Step2> = (0..chain.len().saturating_sub(1)).map(|w| step_between(g, &chain[w], &chain[w + 1], m)).collect();
     let end = *chain.last().unwrap();
-    let stuck = !over(&end) && repeat_at.is_none() && matches!(successors2(g, &end), Ok(v) if v.is_empty());
+    let stuck = !over(&end) && repeat_at.is_none() && matches!(successors_pos(g, &end, m), Ok(v) if v.is_empty());
     Trace2 { steps, repeat_at, end, stuck }
 }
 
-fn root(g: &Graph) -> Pos2 {
+pub(crate) fn root(g: &Graph) -> Pos2 {
     Pos2 { chi: 0, a: g.s, b: g.s, ta: false, tb: false, vis: 1 << g.s }
 }
 
 /// The exact game: every position the adversary can reach (both the choice of agent and of destination), the
 /// positions from which every adversary loses, and either the longest obstruction (explores) or a trapping play.
+#[cfg(test)]
 pub fn exact_game2(g: &Graph, cap: usize) -> Outcome2 {
+    exact_game_m(g, cap, Model::Turns)
+}
+
+pub fn exact_game_m(g: &Graph, cap: usize, m: Model) -> Outcome2 {
     let start = root(g);
     let mut states = vec![start];
     let mut index: Map<Pos2, u32> = Map::default();
@@ -405,7 +456,7 @@ pub fn exact_game2(g: &Graph, cap: usize) -> Outcome2 {
     while i < states.len() {
         let p = states[i];
         if !over(&p) {
-            match successors2(g, &p) {
+            match successors_pos(g, &p, m) {
                 Err(o) => {
                     let mut chain = vec![i as u32];
                     let mut j = i as u32;
@@ -415,10 +466,10 @@ pub fn exact_game2(g: &Graph, cap: usize) -> Outcome2 {
                     }
                     chain.reverse();
                     let ps: Vec<Pos2> = chain.iter().map(|&c| states[c as usize]).collect();
-                    return Outcome2::Undefined { row: o.text(NEED), path: trace_of(g, &ps, None) };
+                    return Outcome2::Undefined { row: o.text(NEED), path: trace_of(g, &ps, None, m) };
                 }
                 Ok(list) => {
-                    for (_, _, q) in list {
+                    for q in list {
                         let j = match index.get(&q) {
                             Some(&j) => j,
                             None => {
@@ -492,7 +543,7 @@ pub fn exact_game2(g: &Graph, cap: usize) -> Outcome2 {
             chain.push(states[next as usize]);
             at = next;
         }
-        return Outcome2::Explores { positions: n, trace: trace_of(g, &chain, None) };
+        return Outcome2::Explores { positions: n, trace: trace_of(g, &chain, None, m) };
     }
     // a trapping play: stay among losing positions, prefer a step that visits something new, until a position repeats
     let mut chain = vec![states[0]];
@@ -528,31 +579,46 @@ pub fn exact_game2(g: &Graph, cap: usize) -> Outcome2 {
             }
         }
     };
-    Outcome2::Fails { positions: n, method: "exact game".into(), trace: trace_of(g, &chain, repeat_at) }
+    Outcome2::Fails { positions: n, method: "exact game".into(), trace: trace_of(g, &chain, repeat_at, m) }
 }
 
 /// One play under an adversary that prefers the vertices in `pref` (a vertex not listed comes last, the smaller
 /// number first).  Agent 0 acts when the agents are together.
+#[cfg(test)]
 pub fn play2(g: &Graph, pref: &[u8], budget: usize) -> Outcome2 {
+    play_m(g, pref, budget, Model::Turns)
+}
+
+pub fn play_m(g: &Graph, pref: &[u8], budget: usize, m: Model) -> Outcome2 {
     let rank = |u: Option<u8>| u.map_or(usize::MAX, |u| pref.iter().position(|&x| x == u).unwrap_or(usize::MAX - 1));
     let mut p = root(g);
     let mut chain = vec![p];
     let mut seen: Map<Pos2, usize> = Map::default();
     loop {
         if over(&p) {
-            let t = trace_of(g, &chain, None);
+            let t = trace_of(g, &chain, None, m);
             return if won(g, &p) { Outcome2::Explores { positions: 0, trace: t } } else { Outcome2::Fails { positions: 0, method: play_method(pref), trace: t } };
         }
         if chain.len() > budget {
-            return Outcome2::Unfinished { trace: trace_of(g, &chain, None) };
+            return Outcome2::Unfinished { trace: trace_of(g, &chain, None, m) };
         }
         if let Some(&s) = seen.get(&p) {
-            return Outcome2::Fails { positions: 0, method: play_method(pref), trace: trace_of(g, &chain, Some(s)) };
+            return Outcome2::Fails { positions: 0, method: play_method(pref), trace: trace_of(g, &chain, Some(s), m) };
         }
         seen.insert(p, chain.len() - 1);
+        if m == Model::Joint {
+            match super::joint::play_step(g, &p, pref) {
+                None => return Outcome2::Fails { positions: 0, method: play_method(pref), trace: trace_of(g, &chain, None, m) },
+                Some((_, q)) => {
+                    p = q;
+                    chain.push(p);
+                }
+            }
+            continue;
+        }
         match enabled(g, &p) {
-            Err(o) => return Outcome2::Undefined { row: o.text(NEED), path: trace_of(g, &chain, None) },
-            Ok(None) => return Outcome2::Fails { positions: 0, method: play_method(pref), trace: trace_of(g, &chain, None) },
+            Err(o) => return Outcome2::Undefined { row: o.text(NEED), path: trace_of(g, &chain, None, m) },
+            Ok(None) => return Outcome2::Fails { positions: 0, method: play_method(pref), trace: trace_of(g, &chain, None, m) },
             Ok(Some((i, _, a, _))) => {
                 let outs = apply(g, &p, i, a);
                 let (_, q) = outs.into_iter().min_by_key(|(d, _)| rank(*d)).unwrap();
@@ -578,25 +644,27 @@ fn target_json2(t: u8) -> String {
     }
 }
 
+/// One step as JSON.  A step of the turn-taking rule has the keys below; a joint step adds `"paints":false` when its
+/// first role does not repaint, and `"second"`, the second role in the same keys.
+pub(crate) fn step_json2(s: &Step2) -> String {
+    format!(
+        "{{\"agent\":{},\"cur\":{},\"other\":{},\"row\":{},\"paint\":{},\"target\":{},\"options\":{},\"next\":{},\"rule\":{}{}{}}}",
+        s.agent,
+        s.cur,
+        s.other,
+        js(&s.row),
+        s.act.paint,
+        target_json2(s.act.target),
+        list(&s.options),
+        s.next.map_or("null".to_string(), |u| u.to_string()),
+        s.rule,
+        if s.paints { "" } else { ",\"paints\":false" },
+        s.second.as_ref().map_or(String::new(), |t| format!(",\"second\":{}", step_json2(t)))
+    )
+}
+
 fn trace_json2(g: &Graph, t: &Trace2) -> String {
-    let steps: Vec<String> = t
-        .steps
-        .iter()
-        .map(|s| {
-            format!(
-                "{{\"agent\":{},\"cur\":{},\"other\":{},\"row\":{},\"paint\":{},\"target\":{},\"options\":{},\"next\":{},\"rule\":{}}}",
-                s.agent,
-                s.cur,
-                s.other,
-                js(&s.row),
-                s.act.paint,
-                target_json2(s.act.target),
-                list(&s.options),
-                s.next.map_or("null".to_string(), |u| u.to_string()),
-                s.rule
-            )
-        })
-        .collect();
+    let steps: Vec<String> = t.steps.iter().map(step_json2).collect();
     let stopped_at = if over(&t.end) && t.end.a == t.end.b { t.end.a.to_string() } else { "null".to_string() };
     format!(
         "{{\"repeat_at\":{},\"unvisited\":{},\"stopped_at\":{},\"stuck\":{},\"agents\":[{},{}],\"steps\":[{}]}}",
@@ -646,19 +714,22 @@ fn outcome_json2(g: &Graph, o: &Outcome2) -> String {
 /// A request with `agents 2`.  Keys as for one agent, plus `cur2` (the second agent's vertex) and `term` (two flags,
 /// 1 = that agent has stopped) for `step`; the rule is the built-in `default a2c5`; `walks` is not offered.
 pub fn handle(r: &Request) -> String {
-    if r.k < NEED {
-        return err(&format!("{} needs {} colours (k {})", NAME, NEED, NEED));
-    }
-    if r.default_raw != NAME {
-        return err(&format!("two agents have one rule, the built-in {} (default {})", NAME, NAME));
+    let Some(m) = Model::of(&r.default_raw) else {
+        return err(&format!("two agents run a built-in rule: {} or {} (default {})", NAME, super::joint::NAME, NAME));
+    };
+    if r.k < m.need() {
+        return err(&format!("{} needs {} colours (k {})", m.name(), m.need(), m.need()));
     }
     if !r.table.is_empty() || !r.bad_rows.is_empty() {
-        return err("two agents: rule tables are not supported, the built-in rule is a2c5");
+        return err(&format!("two agents: rule tables are not supported, the built-in rule is {}", m.name()));
     }
     if r.model == "classic" {
         return err("two agents are judged by the paper model (every vertex visited, both stopped on the start)");
     }
     if r.cmd == "answer" {
+        if m == Model::Joint {
+            return err("a2c4 reads both agents' views at once, so it has no answer for one row: use step, exact or play");
+        }
         let Some(o) = r.row.as_deref().and_then(Obs2::parse) else { return err("row: expected own.bag@p, e.g. 4.20100@h") };
         return match a2c5(&o) {
             Some((a, rule)) => format!("{{\"status\":\"ok\",\"defined\":true,\"source\":\"default\",\"paint\":{},\"target\":{},\"rule\":{}}}", a.paint, target_json2(a.target), rule),
@@ -673,7 +744,7 @@ pub fn handle(r: &Request) -> String {
     match r.cmd.as_str() {
         "step" => {
             let (Some(cur), Some(cur2)) = (r.cur, r.cur2) else { return err("cur and cur2: missing") };
-            if cur >= g.n || cur2 >= g.n || r.colours.len() != g.n as usize || r.colours.iter().any(|&c| c >= NEED) || r.term.len() != 2 {
+            if cur >= g.n || cur2 >= g.n || r.colours.len() != g.n as usize || r.colours.iter().any(|&c| c >= m.need()) || r.term.len() != 2 {
                 return err("step: bad position");
             }
             let mut chi = 0u128;
@@ -690,6 +761,27 @@ pub fn handle(r: &Request) -> String {
             let p = Pos2 { chi, a: cur, b: cur2, ta: r.term[0] != 0, tb: r.term[1] != 0, vis };
             if over(&p) {
                 return "{\"status\":\"ok\",\"over\":true}".to_string();
+            }
+            if m == Model::Joint {
+                // both agents act in one step: the step's first role in the usual keys, the second under `second`,
+                // and `choose`, the vertices the adversary picks from (the role that moves to a colour; else none)
+                return match super::joint::joint_of(g, &p) {
+                    Some(j) if !j.blocked => {
+                        let st = super::joint::step_of(&j, [None, None]);
+                        let choose = j.choose();
+                        let auto = auto_choice(g, vis, &choose);
+                        format!(
+                            "{{\"status\":\"ok\",\"joint\":true,\"defined\":true,\"source\":\"default\",\"step\":{},\"choose\":{},\"auto\":{},\"explored\":{},\"rule\":{},\"tag\":\"{}\"}}",
+                            step_json2(&st),
+                            list(&choose),
+                            auto.map_or("null".to_string(), |u| u.to_string()),
+                            vis == g.full(),
+                            j.id,
+                            super::joint::LABELS[j.id as usize]
+                        )
+                    }
+                    _ => "{\"status\":\"ok\",\"stuck\":true}".to_string(),
+                };
             }
             match enabled(g, &p) {
                 Err(o) => format!("{{\"status\":\"ok\",\"row\":{},\"defined\":false}}", js(&o.text(NEED))),
@@ -714,12 +806,12 @@ pub fn handle(r: &Request) -> String {
                 }
             }
         }
-        "exact" => outcome_json2(g, &exact_game2(g, r.cap.clamp(1_000, 12_000_000))),
+        "exact" => outcome_json2(g, &exact_game_m(g, r.cap.clamp(1_000, 12_000_000), m)),
         "play" => {
             if let Some(&bad) = r.prefer.iter().find(|&&v| v >= g.n) {
                 return err(&format!("prefer: vertex {} is not in the graph (0..{})", bad, g.n - 1));
             }
-            outcome_json2(g, &play2(g, &r.prefer, r.budget.clamp(10, 5_000_000)))
+            outcome_json2(g, &play_m(g, &r.prefer, r.budget.clamp(10, 5_000_000), m))
         }
         "walks" => err("walks are not offered for two agents: use exact or play"),
         other => err(&format!("unknown cmd {}", other)),

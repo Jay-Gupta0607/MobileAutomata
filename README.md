@@ -10,10 +10,11 @@ Simulators for mobile automata exploring graphs.
   exact game.  Rust compiled to WebAssembly, no dependencies.  Source and build
   script in [`workbench/`](workbench/) (`sh workbench/build.sh` rewrites
   `docs/index.html`).
-  A second mode, **two agents** (the *agents* box), runs the built-in five-colour rule A_2x5: two agents that see each other,
-  with the five colours that one agent manages only on restricted classes.  It has been checked on every connected graph of up
-  to eight vertices; it is not proved for all graphs (see [`workbench/README.md`](workbench/README.md), "Two agents", for the
-  model, its assumptions and what is checked).
+  A second mode, **two agents** (the *agents* box), runs one of two built-in rules for two agents that see each other:
+  A_2x5, five colours, the agents take turns (the five colours that one agent manages only on restricted classes), or A_2x4,
+  four colours, the agents act together (a colleague's eleven-rule sheet).  Both have been checked on every connected graph
+  of up to eight vertices; neither is proved for all graphs (see [`workbench/README.md`](workbench/README.md), "Two agents",
+  for the models, their assumptions and what is checked).
 * **DMA Graph Exploration Simulator** — the original cytoscape-based simulator,
   now in [`dma-simulator/`](dma-simulator/) (open its `index.html`).
 

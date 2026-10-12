@@ -18,7 +18,7 @@ let src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const head = '(async function () {', tail = /resetPlay\(\); render\(\);\n\}\)\(\);\s*$/;
 if (!src.includes(head) || !tail.test(src)) throw new Error('the page script no longer has the shape this test expects');
 src = src.replace(head, 'globalThis.__ready = ' + head).replace(tail, `resetPlay(); render();
-globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph, analyse, togglePlay, applyAgents };
+globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph, analyse, togglePlay, applyAgents, setTwoRule, applyChoice, applyPreset };
 })();`);
 
 // a stand-in for an element: remembers what is set on it, answers every method with itself (and notes which were called)
@@ -444,6 +444,145 @@ P.render();
 same([element('#rules-one').hidden, element('#rules-two').hidden, element('#b-walks').disabled], [false, true, false], 'the one-agent Rules tab and the walks are back');
 // the engine refuses what the page never sends, with a message
 check(String(P.engine('cmd walks\nagents 2\nk 5\ngraph 3 0 0-1,1-2\ndefault a2c5\n').message).includes('walks are not offered for two agents'), 'the engine refuses the walks for two agents');
+
+// 16. A_2x4, two agents that act together: the rule chooser brings the rule and four colours, one rule fires per step and BOTH agents act
+//     in it (the ledger has two rows per step), the hand trace of the path has 16 steps, and the engine's exact search is replayed
+Object.assign(P.state, { k: 4, def: 'sigma', agents: 1, back: null, twoRule: 'a2c5', table: new Map(), algoSrc: '', algo: null, algoError: null });
+P.loadGraphText('3 0 0-1,1-2'); P.applyAgents(2); P.setTwoRule('a2c4'); P.save(); P.loadGraphText('3 0 0-1,1-2');
+same([P.state.agents, P.state.k, P.state.def, P.paperMode(), P.cname(1), P.cname(3)], [2, 4, 'a2c4', true, 'head', 'fin'], 'choosing the rule A_2x4 brings four colours, which it names');
+check(P.requestText('step', {}).includes('agents 2\n') && P.requestText('step', {}).includes('default a2c4\n') && !P.requestText('step', {}).includes('table\n'), 'the request says two agents and the rule A_2x4, and sends no table');
+P.render();
+same(String(element('#khint').textContent), 'A_2x4 needs 4 colours', "the colour hint is the rule's");
+same(String(element('#ahint').textContent), 'two agents act together', 'and the agents hint says that they act together');
+check(String(element('#legend').innerHTML).includes('both act in every step'), 'the legend says that both agents act in every step');
+check(element('#rules-two').hidden === false && String(element('#two-rules tbody').innerHTML).split('<tr>').length - 1 === 19 && String(element('#two-rules tbody').innerHTML).includes('R4c') && String(element('#two-rules-h').textContent).includes('11 rules'), 'the Rules tab shows the 19 cases of the 11 rules, tagged as on the sheet');
+{
+  const p = P.state.play;
+  same([p.pending.joint, p.pending.rule, p.pending.row, p.pending.acts.length, p.pending.options], [true, 1, '0.1000@h', 2, [1]], 'the first step: rule R1 for the pair, reading its row, one init neighbour to serve');
+  r = run(100);
+  same([p.done.kind, r.steps, P.playPaperStatus(p).outcome], ['stopped', 16, 'explores'], 'the path 0-1-2 ends after the 16 steps of the hand trace, with both agents stopped on the start');
+  same(p.steps.map((s) => s.rule), [1, 2, 3, 8, 4, 2, 3, 6, 14, 15, 17, 5, 10, 14, 15, 19], 'the case numbers of the hand trace (R1 R2 R3a R4c R3b R2 R3a R4a R7 R8 R9b R3c R5b R7 R8 R11)');
+  check(p.steps.every((s) => s.second && s.second.agent !== s.agent), 'every step has two roles, played by two different agents');
+  same([p.cur, p.cur2, p.term, p.colours], [0, 0, [true, true], [3, 3, 3]], 'both stopped on vertex 0, every vertex fin');
+  const shown = panel(), text = shown.replace(/<[^>]+>/g, '');
+  check(shown.includes('Explored in this play (paper model)') && text.includes('both agents stopped on the start vertex 0') && !text.includes('which agent is activated'), 'the banner says that both agents stopped on the start');
+  P.render();
+  const ledger = String(element('#ledger tbody').innerHTML);
+  check(ledger.split('<tr').length - 1 === 32 && ledger.includes('· R4c') && ledger.includes('→ partner') && ledger.includes('■ stop'), 'the ledger has two rows for each of the 16 steps, tags the cases and shows partner moves and stops');
+  P.undo();
+  check(p.done === null && p.steps.length === 15 && p.term[0] === false && p.term[1] === false && p.pending && p.pending.rule === 19, 'undo after the last step brings both agents back, about to stop together');
+  P.stepOnce(true);
+  same([p.done && p.done.kind, p.steps.length], ['stopped', 16], 'and stepping again stops again');
+}
+// a move the adversary chooses: in the diamond from the tip 2 the first step may serve 0 or 1, and it is the second role (agent B) that goes
+setup({ k: 4, def: 'a2c4', graph: '4 2 0-1,0-2,0-3,1-2,1-3' });
+{
+  const p = P.state.play;
+  same(p.pending.options, [0, 1], 'the first step from the degree-2 start 2: the adversary may serve 0 or 1');
+  P.stepOnce(false);
+  same(p.steps.length, 0, 'Step waits for your choice as the adversary');
+  P.applyChoice(0); // the adversary's click on vertex 0
+  same([p.steps.length, p.cur, p.cur2, p.steps[0].second.next, p.steps[0].next], [1, 2, 0, 0, null], 'the vertex served goes to the role that moves to a colour (agent B), while agent A stays');
+  same([p.colours[2], p.colours[0], p.pending.rule], [1, 0, 2], 'the start became head, and the next case is R2');
+  P.undo();
+  same([p.steps.length, p.cur, p.cur2], [0, 2, 2], 'undo takes both agents back');
+  P.stepOnce(true);
+  same(p.steps.length, 1, 'Auto step chooses for it');
+}
+setup({ k: 4, def: 'a2c4', graph: '4 2 0-1,0-2,0-3,1-2,1-3' });
+{
+  const p = P.state.play;
+  const found = P.engine(P.requestText('exact', { cap: 1000000 }));
+  same([found.status, found.agents, found.positions, found.trace.stopped_at], ['explores', 2, 81, 2], 'the diamond from a tip: the engine explores it against every adversary');
+  P.loadReplay(found.trace); r = run(300);
+  const pl = P.state.play;
+  same([pl.done.kind, P.playPaperStatus(pl).outcome, pl.steps.map((s) => s.rule)], ['stopped', 'explores', found.trace.steps.map((s) => s.rule)], "the replay follows the engine's execution case by case and ends in the same place");
+  same(pl.steps.map((s) => s.second.next), found.trace.steps.map((s) => s.second.next), 'with the same vertices served to the second role');
+}
+// random graphs of every size and family: two agents running A_2x4 explore them in the page
+{
+  const generate2 = (family, n) => { element('#rfam').value = family; element('#rn').value = String(n); alerts.length = 0; P.makeRandomGraph(); return alerts.length === 0; };
+  Object.assign(P.state, { k: 4, def: 'a2c4' });
+  let plays = 0;
+  for (const family of ['any', 'ktf', 'tree', 'cycle']) for (const n of [3, 4, 5, 6, 9, 12, 20]) {
+    check(generate2(family, n), `${family} n=${n}: generated`);
+    const ex = P.engine(P.requestText(n <= 6 ? 'exact' : 'play', n <= 6 ? { cap: 5000000 } : { budget: 100000 }));
+    same(ex.status, 'explores', `${family} n=${n}: the engine says A_2x4 explores ${P.state.edges.map(([u, v]) => u + '-' + v).join(',')}`);
+    run(5000);
+    same([P.state.play.done && P.state.play.done.kind, P.playPaperStatus(P.state.play).outcome], ['stopped', 'explores'], `${family} n=${n}: the page's own play with A_2x4 explores`);
+    plays++;
+  }
+  check(plays >= 25, `${plays} random graphs played with A_2x4`);
+}
+// 17. the nine graphs of a figure, (a) to (i), tried through the page with A_2x4: for each the engine's exact search (every adversary) explores
+//     it from every start vertex and stops on the start, and the page's own play from the start the figure marks ends with both agents stopped
+//     on it and every vertex visited.  (c) is Sketch II, loaded as the preset: the two agents stay.
+{
+  const FIG = {
+    a: '9 2 0-4,1-4,1-5,2-5,2-6,3-7,3-8,4-5,6-7,6-8,7-8',
+    b: '13 0 0-1,0-6,0-12,1-2,1-7,2-3,2-8,3-4,3-9,4-5,4-10,5-11,6-7,7-8,8-9,9-10,10-11',
+    c: null,
+    d: '7 0 0-1,0-5,1-2,1-5,2-3,2-5,3-4,3-5,4-5,4-6',
+    e: '8 0 0-1,0-5,0-7,1-2,1-5,2-3,2-5,3-4,3-5,4-5,4-6',
+    f: '10 0 0-1,0-4,0-8,1-2,1-5,2-3,2-6,3-7,4-5,5-6,6-7,7-9',
+    g: '6 2 0-2,1-3,1-5,2-4,2-5,3-4,3-5,4-5',
+    h: '6 0 0-4,1-5,2-4,2-5,3-4,3-5',
+    i: '7 0 0-1,0-2,0-3,1-2,1-3,1-4,1-5,2-3,2-6',
+  };
+  Object.assign(P.state, { k: 4, def: 'a2c4', agents: 2, twoRule: 'a2c4' });
+  let starts = 0;
+  for (const [name, text] of Object.entries(FIG)) {
+    if (text === null) P.applyPreset('sketch2'); else P.loadGraphText(text);
+    same([P.state.agents, P.state.def], [2, 'a2c4'], `figure (${name}): two agents and A_2x4 stay`);
+    const n = P.state.nodes.length, s0 = P.state.start;
+    for (let s = 0; s < n; s++) {
+      P.state.start = s; P.resetPlay();
+      const ex = P.engine(P.requestText('exact', { cap: 12000000 }));
+      same([ex.status, ex.trace.stopped_at], ['explores', s], `figure (${name}) from vertex ${s}: the engine explores it against every adversary`);
+      starts++;
+    }
+    P.state.start = s0; P.resetPlay();
+    run(5000);
+    const p = P.state.play;
+    same([p.done && p.done.kind, P.playPaperStatus(p).outcome, p.cur, p.cur2, p.vis.size, p.colours.every((c) => c === 3)], ['stopped', 'explores', s0, s0, n, true], `figure (${name}): the page's own play stops both agents on the start with every vertex visited and finished`);
+  }
+  check(starts >= 70, `${starts} (graph, start) pairs explored`);
+}
+// the path is drawn red and the fin green with A_2x4 (the other rules keep their colours by number)
+{
+  setup({ k: 4, def: 'a2c4', graph: '3 0 0-1,1-2' });
+  const p = P.state.play;
+  let guard = 0; while (!p.colours.includes(2) && !p.done && guard++ < 50) P.stepOnce(true);
+  P.render();
+  check(String(element('#svg').innerHTML).includes('fill:var(--cred)') && String(element('#legend').innerHTML).includes('var(--cred)') && String(element('#legend').innerHTML).includes('var(--cgreen)'), 'A_2x4: a path vertex is red, and the legend shows red for path and green for fin');
+  run(200); P.render();
+  check(String(element('#svg').innerHTML).includes('fill:var(--cgreen)') && !String(element('#svg').innerHTML).includes('fill:var(--cred)'), 'A_2x4: at the end every vertex is fin, drawn green');
+  P.setTwoRule('a2c5'); P.render();
+  check(!String(element('#legend').innerHTML).includes('--cred') && !String(element('#legend').innerHTML).includes('--cgreen'), 'A_2x5 keeps the palette by colour number');
+}
+// a preset graph never changes the number of agents: with two agents it loads its graph and the agents, their rule and the colours stay
+{
+  Object.assign(P.state, { k: 4, def: 'a2c4', agents: 2, twoRule: 'a2c4' });
+  P.applyPreset('sketch2');
+  same([P.state.agents, P.state.def, P.state.k, P.state.nodes.length, P.state.play.cur, P.state.play.cur2], [2, 'a2c4', 4, 14, 0, 0], 'Sketch II with two agents: the graph is loaded, the agents, the rule A_2x4 and its four colours stay');
+  calls.length = 0;
+  P.applyPreset('agen6path');
+  same([P.state.agents, P.state.def, P.state.k, P.state.nodes.length], [2, 'a2c4', 4, 3], 'an algorithm preset with two agents: only its graph is loaded, the rule of one agent is not applied');
+  check(calls.includes('insertAdjacentHTML'), 'and a note says so');
+  P.setTwoRule('a2c5'); P.applyPreset('sketch1');
+  same([P.state.agents, P.state.def, P.state.k], [2, 'a2c5', 5], 'the same with A_2x5: it stays');
+  run(5000);
+  same([P.state.play.done && P.state.play.done.kind, P.playPaperStatus(P.state.play).outcome], ['stopped', 'explores'], 'and the page plays the preset graph with the two agents');
+  // a preset made for two agents brings them (and its rule) when one agent is chosen; one agent with a graph preset stays one
+  Object.assign(P.state, { agents: 1, def: 'sigma', k: 4, back: null });
+  P.applyPreset('sketch2');
+  same([P.state.agents, P.state.def, P.state.k], [1, 'sigma', 5], 'one agent chosen: a graph preset leaves it at one agent');
+  P.applyPreset('a4path');
+  same([P.state.agents, P.state.def, P.state.k], [2, 'a2c4', 4], 'and a preset named for two agents brings them with their rule');
+}
+// back to the rule A_2x5 for two agents (the rule chooser), and the choice is kept in the saved state
+P.setTwoRule('a2c5');
+same([P.state.def, P.state.k, P.state.twoRule], ['a2c5', 5, 'a2c5'], 'the rule chooser brings A_2x5 and its five colours back');
 
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

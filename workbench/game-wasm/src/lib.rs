@@ -1547,6 +1547,7 @@ pub unsafe extern "C" fn free_result(ptr: *mut u8) {
     drop(Vec::from_raw_parts(ptr, 0, n + 4));
 }
 
+mod joint;
 #[cfg(test)]
 mod paper_tests;
 mod two;

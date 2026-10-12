@@ -29,11 +29,12 @@ rule
                         ac4    blocks that are cycles or complete bipartite (cacti), 4 colours (same paper)
                         aus5   blocks that are cliques or triangle-free, 5 colours (same paper)
                       and, with --agents 2 only (the default there):
-                        a2c5   any graph, TWO agents, 5 colours (see \"Two agents\" in workbench/README.md)
+                        a2c5   any graph, TWO agents that take turns, 5 colours (see \"Two agents\" in workbench/README.md)
+                        a2c4   TWO agents that act together, 4 colours (a colleague's eleven-rule sheet; same section)
   --table FILE        rows `own.bag paint>target`, one per line; # starts a comment; target is a
                       colour, stay or stop.  Rows in the table win over --rule
   --agents N          1 (default) or 2.  Two agents see each other and run the built-in rule a2c5 (5 colours, the
-                      paper model); tables, --model classic and the walks command are for one agent.  In the
+                      default) or a2c4 (4 colours), in the paper model; tables, --model classic and the walks command are for one agent.  In the
                       answer for two agents a row reads own.bag@p: p is h (the other agent is on this vertex),
                       the colour digit of the neighbour holding it, or - (not next door); e.g. 4.20100@h
   --k N               number of colours, 2 to 6 (default 5; the algorithms of the papers set their own
@@ -216,18 +217,19 @@ fn build_request(a: &Args) -> Result<String, String> {
             return Err("`walks` is for one agent: with two agents use `exact` or `play`".into());
         }
         if let Some(rule) = &a.rule {
-            if rule != "a2c5" {
-                return Err(format!("two agents run the rule a2c5, not {}", rule));
+            if rule != "a2c5" && rule != "a2c4" {
+                return Err(format!("two agents run the rule a2c5 or a2c4, not {}", rule));
             }
         }
-    } else if a.rule.as_deref() == Some("a2c5") {
-        return Err("a2c5 is a two-agent rule: add --agents 2".into());
+    } else if let Some(rule @ ("a2c5" | "a2c4")) = a.rule.as_deref() {
+        return Err(format!("{} is a two-agent rule: add --agents 2", rule));
     }
     let mut r = format!("cmd {}\n", a.command);
     if agents == 2 {
-        r += "agents 2\ndefault a2c5\n";
+        let rule = a.rule.as_deref().unwrap_or("a2c5");
+        r += &format!("agents 2\ndefault {}\n", rule);
         if a.k.is_none() {
-            r += "k 5\n";
+            r += if rule == "a2c4" { "k 4\n" } else { "k 5\n" };
         }
     }
     if let Some(k) = &a.k {

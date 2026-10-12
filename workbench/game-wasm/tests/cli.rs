@@ -380,7 +380,7 @@ fn two_agents_play_and_answer() {
 #[test]
 fn two_agents_refuse_what_is_for_one_agent() {
     for (args, text) in [
-        (vec!["exact", "--graph", PATH4, "--agents", "2", "--rule", "aus5"], "two agents run the rule a2c5, not aus5"),
+        (vec!["exact", "--graph", PATH4, "--agents", "2", "--rule", "aus5"], "two agents run the rule a2c5 or a2c4, not aus5"),
         (vec!["walks", "--graph", PATH4, "--agents", "2"], "`walks` is for one agent"),
         (vec!["exact", "--graph", PATH4, "--rule", "a2c5"], "a2c5 is a two-agent rule: add --agents 2"),
         (vec!["exact", "--graph", PATH4, "--agents", "3"], "--agents must be between 1 and 2"),
@@ -396,4 +396,33 @@ fn two_agents_refuse_what_is_for_one_agent() {
     assert!(stderr(&o).contains("--table is for one agent"), "{}", stderr(&o));
     let help = stdout(&run(&["--help"]));
     assert!(help.contains("a2c5") && help.contains("--agents"), "--help does not mention the two-agent rule");
+}
+
+#[test]
+fn two_agents_that_act_together_run_the_four_colour_sheet() {
+    // the diamond from a tip, which the older sheet got stuck on, is explored by every adversary
+    let two = run(&["exact", "--graph", DIAMOND, "--agents", "2", "--rule", "a2c4", "--summary"]);
+    assert_eq!(code(&two), 0, "{}", stdout(&two));
+    assert_eq!(stdout(&two).trim(), "explores (paper model, 2 agents), 81 positions, stopped on vertex 2");
+    // the rule brings its own number of colours and request lines
+    let req = stdout(&run(&["exact", "--graph", DIAMOND, "--agents", "2", "--rule", "a2c4", "--request"]));
+    for line in ["agents 2", "default a2c4", "k 4"] {
+        assert!(req.lines().any(|l| l == line), "{}: {}", line, req);
+    }
+    // a play of the path: 16 joint steps, each with both agents' actions (the hand trace in joint.rs)
+    let o = run(&["play", "--graph", "3 0 0-1,1-2", "--agents", "2", "--rule", "a2c4", "--prefer", "1 2 0"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let json = stdout(&o);
+    assert!(json.contains("\"stopped_at\":0") && json.matches("\"second\":{").count() == 16, "{}", json);
+    // one row is not enough to answer: a rule reads both agents' views
+    let a = run(&["answer", "--agents", "2", "--rule", "a2c4", "--row", "1.0100@h"]);
+    assert!(stdout(&a).contains("no answer for one row"), "{}", stdout(&a));
+    // one colour fewer is an error that names the rule and its number; the rule is for two agents only
+    let few = run(&["exact", "--graph", PATH4, "--agents", "2", "--rule", "a2c4", "--k", "3", "--summary"]);
+    assert_eq!(code(&few), 64);
+    assert!(stdout(&few).starts_with("error: a2c4 needs 4 colours"), "{}", stdout(&few));
+    let one = run(&["exact", "--graph", PATH4, "--rule", "a2c4"]);
+    assert_eq!(code(&one), 64);
+    assert!(stderr(&one).contains("a2c4 is a two-agent rule: add --agents 2"), "{}", stderr(&one));
+    assert!(stdout(&run(&["--help"])).contains("a2c4"), "--help does not mention a2c4");
 }

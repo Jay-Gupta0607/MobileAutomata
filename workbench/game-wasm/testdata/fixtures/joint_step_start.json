@@ -1,0 +1,1 @@
+{"status":"ok","joint":true,"defined":true,"source":"default","step":{"agent":0,"cur":0,"other":0,"row":"0.1000@h","paint":1,"target":-1,"options":[],"next":null,"rule":1,"second":{"agent":1,"cur":0,"other":0,"row":"0.1000@h","paint":0,"target":0,"options":[1],"next":null,"rule":1,"paints":false}},"choose":[1],"auto":1,"explored":false,"rule":1,"tag":"R1"}

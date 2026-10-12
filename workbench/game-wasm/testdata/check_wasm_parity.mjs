@@ -43,7 +43,7 @@ if (names.length < 20) { console.log(`only ${names.length} fixtures found`); bad
 // the page's own presets that bring one of the algorithms of the papers must explore in this engine, and have a position for every vertex
 {
   const page = readFileSync(join(workbench, 'site', 'index.html'), 'utf8').replace(/\r\n/g, '\n');
-  const a = page.indexOf('const PRESETS = {'), b = page.indexOf('\n', page.indexOf('PRESETS.a2sketch1'));
+  const a = page.indexOf('const PRESETS = {'), b = page.indexOf('\n', page.indexOf('PRESETS.a4wheel'));
   const PRESETS = new Function(page.slice(a, b) + '\nreturn PRESETS;')();
   let n = 0;
   for (const [name, pr] of Object.entries(PRESETS).filter(([, p]) => ['agen6', 'atc3', 'ac4', 'aus5'].includes(p.def))) {
@@ -60,13 +60,13 @@ if (names.length < 20) { console.log(`only ${names.length} fixtures found`); bad
   let two = 0;
   for (const [name, pr] of Object.entries(PRESETS).filter(([, p]) => p.agents === 2)) {
     const nodes = +pr.text.split(/\s+/)[0];
-    const got = JSON.parse(run(`cmd exact\nagents 2\nk ${pr.k}\ngraph ${pr.text}\ndefault a2c5\ncap 2000000\n`));
-    const ok = pr.def === 'a2c5' && got.status === 'explores' && got.agents === 2 && got.trace.stopped_at === +pr.text.split(/\s+/)[1] && (!pr.coords || pr.coords.length === nodes);
+    const got = JSON.parse(run(`cmd exact\nagents 2\nk ${pr.k}\ngraph ${pr.text}\ndefault ${pr.def}\ncap 2000000\n`));
+    const ok = ['a2c5', 'a2c4'].includes(pr.def) && got.status === 'explores' && got.agents === 2 && got.trace.stopped_at === +pr.text.split(/\s+/)[1] && (!pr.coords || pr.coords.length === nodes);
     if (ok) console.log(`ok    preset ${name} (two agents) explores (${got.positions} positions)`);
     else { bad++; console.log(`FAIL  preset ${name} (two agents): ${got.status}, ${pr.coords ? pr.coords.length : 'no'} coordinates for ${nodes} vertices`); }
     two++;
   }
-  if (two < 4) { bad++; console.log(`only ${two} presets for two agents found`); }
+  if (two < 8) { bad++; console.log(`only ${two} presets for two agents found`); }
 }
 
 // the colour counts the page's hint states must be the engine's: one colour fewer and the rule has no answer (A_Gen6 is an error)
@@ -76,9 +76,10 @@ if (names.length < 20) { console.log(`only ${names.length} fixtures found`); bad
   const COLOUR_NEED = new Function(page.slice(a, b) + '\nreturn COLOUR_NEED;')();
   for (const [rule, need] of Object.entries(COLOUR_NEED)) {
     // the two-agent rule is asked with two agents, on a row of its own shape (own.bag@p)
-    const at = (k) => JSON.parse(run(rule === 'a2c5' ? `cmd answer\nagents 2\nk ${k}\nrow 0.30000@h\ndefault a2c5\n` : `cmd answer\nk ${k}\nrow 0.1\ndefault ${rule}\n`));
+    // (A_2x4 reads both agents' views at once and has no answer for one row: it is asked for an exact search of a one-edge graph)
+    const at = (k) => JSON.parse(run(rule === 'a2c5' ? `cmd answer\nagents 2\nk ${k}\nrow 0.30000@h\ndefault a2c5\n` : rule === 'a2c4' ? `cmd exact\nagents 2\nk ${k}\ngraph 2 0 0-1\ndefault a2c4\n` : `cmd answer\nk ${k}\nrow 0.1\ndefault ${rule}\n`));
     const fewer = at(need.n - 1), enough = at(need.n);
-    const ok = (fewer.status === 'error' || fewer.defined === false) && enough.status === 'ok' && enough.defined === true;
+    const ok = (fewer.status === 'error' || fewer.defined === false) && ((enough.status === 'ok' && enough.defined === true) || (rule === 'a2c4' && enough.status === 'explores'));
     if (ok) console.log(`ok    ${rule} needs ${need.n} colours, as the page says`);
     else { bad++; console.log(`FAIL  ${rule}: the page says ${need.n} colours, the engine answers ${JSON.stringify(fewer)} with ${need.n - 1} and ${JSON.stringify(enough)} with ${need.n}`); }
   }
