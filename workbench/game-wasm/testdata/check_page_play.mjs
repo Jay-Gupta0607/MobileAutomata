@@ -18,7 +18,7 @@ let src = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const head = '(async function () {', tail = /resetPlay\(\); render\(\);\n\}\)\(\);\s*$/;
 if (!src.includes(head) || !tail.test(src)) throw new Error('the page script no longer has the shape this test expects');
 src = src.replace(head, 'globalThis.__ready = ' + head).replace(tail, `resetPlay(); render();
-globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph, analyse, togglePlay, applyAgents, setTwoRule, applyChoice, applyPreset };
+globalThis.__page = { state, loadGraphText, resetPlay, stepOnce, undo, loadReplay, render, save, paperMode, namedColours, cname, usesStop, engine, requestText, compileAlgo, ALGO_TEMPLATES, playPaperStatus, makeRandomGraph, analyse, togglePlay, applyAgents, setTwoRule, applyChoice, applyPreset, chooseColours };
 })();`);
 
 // a stand-in for an element: remembers what is set on it, answers every method with itself (and notes which were called)
@@ -583,6 +583,42 @@ setup({ k: 4, def: 'a2c4', graph: '4 2 0-1,0-2,0-3,1-2,1-3' });
 // back to the rule A_2x5 for two agents (the rule chooser), and the choice is kept in the saved state
 P.setTwoRule('a2c5');
 same([P.state.def, P.state.k, P.state.twoRule], ['a2c5', 5, 'a2c5'], 'the rule chooser brings A_2x5 and its five colours back');
+
+// 17. two agents: the colour picker chooses the rule.  Five colours bring A_2x5, four bring A_2x4, another number leaves the rule; the
+//     one-agent table is not touched while two agents are chosen (with one agent, rows beyond the palette are still removed).
+Object.assign(P.state, { k: 5, def: 'sigma', agents: 1, back: null, twoRule: 'a2c5', table: new Map([['0.10000', { paint: 4, target: 0 }], ['0.0100', { paint: 1, target: 0 }]]), algoSrc: '', algo: null, algoError: null });
+P.loadGraphText('3 0 0-1,1-2'); P.applyAgents(2);
+same([P.state.agents, P.state.k, P.state.def], [2, 5, 'a2c5'], 'two agents start with five colours and A_2x5');
+const hintText = () => (P.render(), String(element('#khint').textContent));
+same([P.chooseColours(4), P.state.k, P.state.def, P.state.twoRule, String(element('#k').value)], [0, 4, 'a2c4', 'a2c4', '4'], 'choosing four colours with two agents brings A_2x4');
+same([hintText(), P.cname(1), P.paperMode()], ['A_2x4 needs 4 colours', 'head', true], 'and the hint, the colour names and the paper model are those of A_2x4');
+check(P.requestText('step', {}).includes('agents 2\n') && P.requestText('step', {}).includes('k 4\n') && P.requestText('step', {}).includes('default a2c4\n'), 'the request says two agents, four colours and A_2x4');
+same([P.chooseColours(5), P.state.k, P.state.def, P.state.twoRule, String(element('#k').value)], [0, 5, 'a2c5', 'a2c5', '5'], 'choosing five colours brings A_2x5 back');
+same([hintText(), P.cname(4)], ['A_2x5 needs 5 colours', 'head'], 'with its hint and its colour names');
+// another number leaves the rule as it is
+P.chooseColours(4); P.chooseColours(6);
+same([P.state.k, P.state.def, hintText()], [6, 'a2c4', 'A_2x4 needs 4 colours (the other 2 unused)'], 'six colours leave A_2x4 in use, two of them unused');
+P.chooseColours(3);
+same([P.state.k, P.state.def, hintText()], [3, 'a2c4', 'A_2x4 needs 4 colours (now 3)'], 'three colours leave A_2x4 in use, with the warning that it has too few');
+P.chooseColours(5); P.chooseColours(2);
+same([P.state.k, P.state.def, P.state.twoRule], [2, 'a2c5', 'a2c5'], 'two colours leave A_2x5 in use');
+// the one-agent table is for one agent: it is not touched, whatever the number of colours
+P.chooseColours(4); P.chooseColours(2);
+same([P.state.table.size, P.state.agents], [2, 2], 'with two agents the table of one agent keeps both its rows, even those that use colour 4');
+// and each rule plays correctly after the colour picker brought it
+for (const [colours, rule] of [[4, 'a2c4'], [5, 'a2c5']]) {
+  P.chooseColours(colours); P.loadGraphText('4 0 0-1,0-2,1-3'); P.render();
+  same([P.state.def, P.state.k], [rule, colours], `${rule}: chosen by ${colours} colours`);
+  const ex = P.engine(P.requestText('exact', { cap: 1000000 }));
+  same([ex.status, ex.agents], ['explores', 2], `${rule}: the engine explores the tree with two agents`);
+  run(400);
+  same([P.state.play.done && P.state.play.done.kind, P.playPaperStatus(P.state.play).outcome], ['stopped', 'explores'], `${rule}: the page's own play ends with both agents stopped on the start`);
+}
+// one agent again: the colours go back, and now rows that use colours beyond the palette are removed, as before
+P.applyAgents(1);
+same([P.state.agents, P.state.def, P.state.k], [1, 'sigma', 5], 'one agent again: the rule and the colours of before');
+same([P.chooseColours(4), P.state.table.size, P.state.def, [...P.state.table.keys()]], [1, 1, 'sigma', ['0.0100']], 'with one agent, choosing four colours removes the row that used colour 4 and leaves the rule as it is');
+same([P.chooseColours(5), P.state.def], [0, 'sigma'], 'and five colours leave the rule alone');
 
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

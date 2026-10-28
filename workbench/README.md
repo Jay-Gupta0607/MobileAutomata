@@ -55,7 +55,9 @@ or newer.
 * **Two agents.** The *agents* box in the header chooses one agent or two.  Two agents see each other and run a built-in
   rule, chosen in the Rules tab: **A_2x5** (the agents take turns, five colours: init, path, neigh, fin, head) or **A_2x4**
   (the agents act together, four colours: init, head, path, fin; a colleague's eleven-rule sheet).  The number of colours is
-  set to the rule's; tables and code are for one agent (they are kept, and come back when you choose one agent again).  The
+  set to the rule's, and the other way round: with two agents, choosing **5 colours** in the colours box selects A_2x5 and
+  choosing **4 colours** selects A_2x4 (another number leaves the rule as it is; the hint says when it has too few colours).
+  Tables and code are for one agent (they are kept untouched, and come back when you choose one agent again).  The
   graph shows agent A (purple ring) and agent B (amber ring).  With A_2x5 the Play tab names the agent that acts at each step
   (A works, B marks the head and follows) and the ledger tags rules T1 to T21; with A_2x4 one rule fires for the pair, both
   agents act in the step (two ledger rows per step) and the ledger tags the sheet's cases R1 to R11 (R3a, R4c and so on).  The

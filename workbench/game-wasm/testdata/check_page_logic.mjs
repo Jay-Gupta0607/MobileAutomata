@@ -24,7 +24,7 @@ for (const [name, text] of [['site/index.html', html], ['docs/index.html', readF
 }
 const a = html.indexOf('// <page-logic>'), b = html.indexOf('// </page-logic>');
 if (a < 0 || b < a) throw new Error('the page-logic block was not found in site/index.html');
-const { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, RANDOM_FAMILIES, randomGraph, springLayout, treeLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, RANDOM_FAMILIES, randomGraph, springLayout, treeLayout, layoutArea };')();
+const { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, twoRuleForColours, RANDOM_FAMILIES, randomGraph, springLayout, treeLayout, layoutArea } = new Function(html.slice(a, b) + '\nreturn { paperStatus, colourLabel, colourHint, COLOUR_NEED, PAPER_ALGOS, ruleTag, ruleText, algoOfCode, article, stepsDue, twoRuleForColours, RANDOM_FAMILIES, randomGraph, springLayout, treeLayout, layoutArea };')();
 
 let bad = 0;
 const check = (ok, what) => { if (!ok) { bad++; console.log('FAIL  ' + what); } };
@@ -79,6 +79,12 @@ same(['init', 'unused', 'Init', 'white', 'l0', 'head1', 'neigh', 'fin', 'front',
 // 2a. the steps a play tick owes (a late tick catches up; never fewer than one, never more than the cap)
 same([stepsDue(0, 130, 2000), stepsDue(50, 130, 2000), stepsDue(130, 130, 2000), stepsDue(260, 130, 2000), stepsDue(1000, 130, 2000), stepsDue(60000, 130, 2000), stepsDue(1e9, 130, 2000)], [1, 1, 1, 2, 7, 461, 2000], 'steps due by the clock');
 same([stepsDue(-5, 130, 2000), stepsDue(NaN, 130, 2000), stepsDue(Infinity, 130, 2000), stepsDue(500, 0, 2000), stepsDue(500, NaN, 2000)], [1, 1, 1, 1, 1], 'a clock that makes no sense still gives one step');
+
+// 2a-ii. with two agents the colour count chooses the rule: five colours A_2x5, four A_2x4, any other number leaves the rule as it is
+same([twoRuleForColours(5, 'a2c4'), twoRuleForColours(4, 'a2c5'), twoRuleForColours(5, 'a2c5'), twoRuleForColours(4, 'a2c4')], ['a2c5', 'a2c4', 'a2c5', 'a2c4'], 'five colours are A_2x5, four are A_2x4, whatever rule was in use');
+same([2, 3, 6].flatMap((k) => ['a2c5', 'a2c4'].map((rule) => twoRuleForColours(k, rule))), ['a2c5', 'a2c4', 'a2c5', 'a2c4', 'a2c5', 'a2c4'], 'two, three or six colours leave the rule in use as it is');
+same(['a2c5', 'a2c4'].map((rule) => twoRuleForColours(COLOUR_NEED[rule].n, 'x')), ['a2c5', 'a2c4'], "each two-agent rule is the one for its own number of colours (COLOUR_NEED), so the two stay in step");
+check(html.includes("$('#k').addEventListener('change', (e) => { const rule = state.def, dropped = chooseColours("), 'the colour picker of the page calls chooseColours');
 
 // 2b. the hint next to the colours picker
 same(colourHint('agen6', 6), { text: 'A_Gen6 needs 6 colours', warn: false }, 'A_Gen6 with six colours');

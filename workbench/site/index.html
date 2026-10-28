@@ -379,6 +379,9 @@ function colourHint(rule, k) {
   if (k < need.n) return { text: `${text} (now ${k})`, warn: true };
   return { text: need.exact && k > need.n ? `${text} (the other ${k - need.n} unused)` : text, warn: false };
 }
+// With two agents the number of colours and the rule go together: five colours are A_2x5 (taking turns), four are A_2x4 (acting
+// together).  Any other number leaves the rule in use (`current`, a key) as it is; the colour hint says when it has too few.
+function twoRuleForColours(k, current) { return ['a2c5', 'a2c4'].find((rule) => COLOUR_NEED[rule].n === k) || current; }
 // Random graphs, from the families the algorithms of the papers are built for, each inside the next: trees and simple cycles
 // (A_TC3), cacti and graphs whose blocks are cycles or complete bipartite graphs (A_C4), graphs whose blocks are cliques or
 // triangle-free (A_US5), and all connected graphs (A_Gen6).  `from` is the first algorithm guaranteed to explore the family; the
@@ -1167,6 +1170,19 @@ function setTwoRule(rule) {
   state.twoRule = rule; if (state.agents === 2) state.def = rule;
   state.k = COLOUR_NEED[rule].n; $('#k').value = state.k;
 }
+// The colour picker: the palette becomes k colours.  With two agents the rule follows the number (twoRuleForColours): five colours bring A_2x5,
+// four bring A_2x4, another number leaves the rule as it is.  The table is for one agent and is not used with two, so it is left alone then.
+// With one agent, the rows that use colours beyond the new palette are removed.  Returns how many rows were removed.  Callers reset the play and redraw.
+function chooseColours(k) {
+  state.k = k;
+  if (state.agents === 2) { const rule = twoRuleForColours(k, state.def); if (rule !== state.def) setTwoRule(rule); return 0; }
+  let dropped = 0;
+  for (const [r, a] of [...state.table.entries()]) {
+    const own = +r.split('.')[0], bag = r.split('.')[1];
+    if (own >= k || a.paint >= k || a.target >= k || bag.length > k || [...bag].some((d, i) => i >= k && d !== '0')) { state.table.delete(r); dropped++; }
+  }
+  return dropped;
+}
 // The algorithm of the papers in use, or null: it names its colours (init, path, ...) and numbers its rules.  Code in use
 // answers before the fallback, so its colours are an algorithm's only if it is that algorithm's template.
 function activeAlgo() {
@@ -1451,7 +1467,7 @@ svg.addEventListener('dblclick', (evt) => { const nodeEl = evt.target.closest('.
 // ------------------------------------------------------------ controls
 document.querySelectorAll('header [data-mode]').forEach((b) => b.addEventListener('click', () => { state.mode = b.dataset.mode; state.edgeFrom = null; document.querySelectorAll('header [data-mode]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); render(); }));
 document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
-$('#k').addEventListener('change', (e) => { state.k = +e.target.value; let dropped = 0; for (const [r, a] of [...state.table.entries()]) { const own = +r.split('.')[0], bag = r.split('.')[1]; if (own >= state.k || a.paint >= state.k || a.target >= state.k || bag.length > state.k || [...bag].some((d, i) => i >= state.k && d !== '0')) { state.table.delete(r); dropped++; } } if (dropped) flash(`${dropped} table rows used colours beyond the new palette and were removed.`); save(); resetPlay(); render(); });
+$('#k').addEventListener('change', (e) => { const rule = state.def, dropped = chooseColours(+e.target.value); if (dropped) flash(`${dropped} table rows used colours beyond the new palette and were removed.`); if (state.def !== rule) forgetAnalysis(); save(); resetPlay(); render(); });
 $('#preset').addEventListener('change', (e) => { const v = e.target.value; e.target.value = ''; if (v) applyPreset(v); });
 function applyPreset(v) { if (v === 'clear') { state.nodes = []; state.edges = []; state.start = 0; forgetAnalysis(); resetPlay(); save(); render(); return; } const pr = PRESETS[v];
   // With two agents chosen, a preset made for one agent (a plain graph, or an algorithm of the papers with its graph) loads its graph
