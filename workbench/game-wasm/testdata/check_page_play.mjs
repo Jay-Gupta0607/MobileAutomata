@@ -453,7 +453,7 @@ same([P.state.agents, P.state.k, P.state.def, P.paperMode(), P.cname(1), P.cname
 check(P.requestText('step', {}).includes('agents 2\n') && P.requestText('step', {}).includes('default a2c4\n') && !P.requestText('step', {}).includes('table\n'), 'the request says two agents and the rule A_2x4, and sends no table');
 P.render();
 same(String(element('#khint').textContent), 'A_2x4 needs 4 colours', "the colour hint is the rule's");
-same(String(element('#ahint').textContent), 'two agents act together', 'and the agents hint says that they act together');
+same(String(element('#ahint').textContent), 'two agents act together (communicating)', 'and the agents hint says that they act together and communicate');
 check(String(element('#legend').innerHTML).includes('both act in every step'), 'the legend says that both agents act in every step');
 check(element('#rules-two').hidden === false && String(element('#two-rules tbody').innerHTML).split('<tr>').length - 1 === 19 && String(element('#two-rules tbody').innerHTML).includes('R4c') && String(element('#two-rules-h').textContent).includes('11 rules'), 'the Rules tab shows the 19 cases of the 11 rules, tagged as on the sheet');
 {
@@ -619,6 +619,102 @@ P.applyAgents(1);
 same([P.state.agents, P.state.def, P.state.k], [1, 'sigma', 5], 'one agent again: the rule and the colours of before');
 same([P.chooseColours(4), P.state.table.size, P.state.def, [...P.state.table.keys()]], [1, 1, 'sigma', ['0.0100']], 'with one agent, choosing four colours removes the row that used colour 4 and leaves the rule as it is');
 same([P.chooseColours(5), P.state.def], [0, 'sigma'], 'and five colours leave the rule alone');
+
+// 18. A_2x4n, two agents that do not communicate: the rule chooser brings it with four colours and labels it, the adversary activates one agent per
+//     step (Agent 1 = A, Agent 2 = B, one ledger row per step), the hand trace of the path has 16 steps, the triangle fires all 13 rules, the
+//     presets bring it, the colour picker keeps it at four colours, and the engine's exact search is replayed.
+check(html.includes('<option value="a2c4">A_2x4 · act together · four colours · communicating</option>') && html.includes('<option value="a2c4n">A_2x4n · separate rules · four colours · non communicating</option>'), 'the rule chooser labels A_2x4 as communicating and A_2x4n as non communicating');
+Object.assign(P.state, { k: 4, def: 'sigma', agents: 1, back: null, twoRule: 'a2c5', table: new Map(), algoSrc: '', algo: null, algoError: null });
+P.loadGraphText('3 0 0-1,1-2'); P.applyAgents(2); P.setTwoRule('a2c4n'); P.save(); P.loadGraphText('3 0 0-1,1-2');
+same([P.state.agents, P.state.k, P.state.def, P.paperMode(), P.cname(1), P.cname(3)], [2, 4, 'a2c4n', true, 'head', 'fin'], 'choosing the rule A_2x4n brings four colours, which it names');
+check(P.requestText('step', {}).includes('agents 2\n') && P.requestText('step', {}).includes('default a2c4n\n') && !P.requestText('step', {}).includes('table\n'), 'the request says two agents and the rule A_2x4n, and sends no table');
+P.render();
+same(String(element('#khint').textContent), 'A_2x4n needs 4 colours', "the colour hint is the rule's");
+same(String(element('#ahint').textContent), 'two agents, separate rules (non communicating)', 'and the agents hint says that they run separate rules and do not communicate');
+check(String(element('#legend').innerHTML).includes('Agent 1 (follows)') && String(element('#legend').innerHTML).includes('Agent 2 (leads)'), 'the legend names the two agents');
+check(element('#rules-two').hidden === false && String(element('#two-rules tbody').innerHTML).split('<tr>').length - 1 === 13 && String(element('#two-rules tbody').innerHTML).includes('A2·H.iii') && String(element('#two-rules-h').textContent).includes('13 rules') && String(element('#two-intro').innerHTML).includes('non communicating'), 'the Rules tab shows the 13 rules, tagged as on the sheet, and says non communicating');
+{
+  const p = P.state.play;
+  same([p.pending.joint, p.pending.agent, p.pending.rule, p.pending.row, p.pending.options], [undefined, 1, 5, '0.1000@h', [1]], 'the first step: Agent 2 (agent B) applies its start rule; Agent 1 has nothing to do');
+  r = run(100);
+  same([p.done.kind, r.steps, P.playPaperStatus(p).outcome], ['stopped', 16, 'explores'], 'the path 0-1-2 ends after the 16 steps of the hand trace, with both agents stopped on the start');
+  same(p.steps.map((s) => s.rule), [5, 6, 1, 8, 6, 1, 2, 3, 9, 13, 2, 3, 9, 13, 4, 10], 'the rule numbers of the hand trace');
+  same(p.steps.map((s) => s.agent), [1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1], 'Agent 2 leads and Agent 1 follows: who acts at each step');
+  check(p.steps.every((s) => !s.second), 'one agent acts per step');
+  same([p.cur, p.cur2, p.term, p.colours], [0, 0, [true, true], [3, 3, 3]], 'both stopped on vertex 0, every vertex fin');
+  const shown = panel(), text = shown.replace(/<[^>]+>/g, '');
+  check(shown.includes('Explored in this play (paper model)') && text.includes('both agents stopped on the start vertex 0') && text.includes('including which agent is activated'), 'the banner says that both agents stopped on the start');
+  P.render();
+  const ledger = String(element('#ledger tbody').innerHTML);
+  check(ledger.split('<tr').length - 1 === 16 && ledger.includes('· A2·H.iii') && ledger.includes('→ partner') && ledger.includes('■ stop'), 'the ledger has one row for each of the 16 steps, tags the rules and shows partner moves and stops');
+  P.undo();
+  check(p.done === null && p.steps.length === 15 && p.term[0] === true && p.term[1] === false && p.pending && p.pending.rule === 10, 'undo after the last step brings Agent 2 back, about to stop (Agent 1 stopped one step earlier)');
+  P.stepOnce(true);
+  same([p.done && p.done.kind, p.steps.length], ['stopped', 16], 'and stepping again stops again');
+}
+// the triangle: the smallest graph on which every rule fires (the probed vertex touches the path twice, is marked head, and the mark is cleaned up)
+setup({ k: 4, def: 'a2c4n', graph: '3 0 0-1,1-2,0-2' });
+{
+  const p = P.state.play;
+  run(300);
+  same([p.done.kind, P.playPaperStatus(p).outcome], ['stopped', 'explores'], 'the triangle is explored');
+  same([...new Set(p.steps.map((s) => s.rule))].sort((x, y) => x - y), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], 'all 13 rules fire on the triangle');
+}
+// a move the adversary chooses: in the diamond from the tip 2 the first step may serve 0 or 1, and Agent 2 (agent B) is the one that moves
+setup({ k: 4, def: 'a2c4n', graph: '4 2 0-1,0-2,0-3,1-2,1-3' });
+{
+  const p = P.state.play;
+  same(p.pending.options, [0, 1], 'the first step from the degree-2 start 2: the adversary may serve 0 or 1');
+  P.stepOnce(false);
+  same(p.steps.length, 0, 'Step waits for your choice as the adversary');
+  P.applyChoice(0);
+  same([p.steps.length, p.cur, p.cur2, p.steps[0].next, p.colours[2]], [1, 2, 0, 0, 2], 'the vertex served goes to Agent 2 (B) while Agent 1 (A) stays, and the start became path');
+  P.undo();
+  same([p.steps.length, p.cur, p.cur2], [0, 2, 2], 'undo takes the agent back');
+  P.stepOnce(true);
+  same(p.steps.length, 1, 'Auto step chooses for it');
+  const found = P.engine(P.requestText('exact', { cap: 1000000 }));
+  same([found.status, found.agents, found.positions, found.trace.stopped_at], ['explores', 2, 67, 2], 'the diamond from a tip: the engine explores it against every adversary (67 positions, as the independent checker counts)');
+  setup({ k: 4, def: 'a2c4n', graph: '4 2 0-1,0-2,0-3,1-2,1-3' });
+  P.loadReplay(found.trace); r = run(300);
+  const pl = P.state.play;
+  same([pl.done.kind, P.playPaperStatus(pl).outcome, pl.steps.map((s) => s.rule)], ['stopped', 'explores', found.trace.steps.map((s) => s.rule)], "the replay follows the engine's execution rule by rule and ends in the same place");
+}
+// the presets bring two agents, the rule and four colours, and each explores in the page
+for (const name of ['a4npath', 'a4ntri', 'a4ntail', 'a4ndiamond', 'a4nwheel']) {
+  Object.assign(P.state, { k: 5, def: 'sigma', agents: 1, back: null, twoRule: 'a2c5', table: new Map(), algoSrc: '', algo: null, algoError: null });
+  P.applyPreset(name); P.resetPlay(); P.render();
+  same([P.state.agents, P.state.def, P.state.k], [2, 'a2c4n', 4], `preset ${name}: two agents, the rule A_2x4n and four colours`);
+  run(5000);
+  same([P.state.play.done && P.state.play.done.kind, P.playPaperStatus(P.state.play).outcome], ['stopped', 'explores'], `preset ${name}: the page's own play explores`);
+}
+// the colour picker keeps the rule at four colours, and five colours bring A_2x5 (the other four-colour rule would not come back by itself: A_2x4 is the first to fit)
+P.setTwoRule('a2c4n');
+same([P.chooseColours(4), P.state.k, P.state.def, P.state.twoRule], [0, 4, 'a2c4n', 'a2c4n'], 'choosing four colours leaves A_2x4n in use');
+same([P.chooseColours(5), P.state.def], [0, 'a2c5'], 'five colours bring A_2x5');
+P.setTwoRule('a2c4n'); P.chooseColours(6);
+same([P.state.k, P.state.def, hintText()], [6, 'a2c4n', 'A_2x4n needs 4 colours (the other 2 unused)'], 'six colours leave A_2x4n in use, two of them unused');
+P.chooseColours(3);
+same([P.state.k, P.state.def, hintText()], [3, 'a2c4n', 'A_2x4n needs 4 colours (now 3)'], 'three colours leave A_2x4n in use, with the warning that it has too few');
+// random graphs of every size and family: two agents running A_2x4n explore them in the page
+{
+  const generate2 = (family, n) => { element('#rfam').value = family; element('#rn').value = String(n); alerts.length = 0; P.makeRandomGraph(); return alerts.length === 0; };
+  Object.assign(P.state, { k: 4, def: 'a2c4n', agents: 2, twoRule: 'a2c4n' });
+  let plays = 0;
+  for (const family of ['any', 'ktf', 'tree', 'cycle']) for (const n of [3, 4, 5, 6, 9, 12, 20]) {
+    check(generate2(family, n), `${family} n=${n}: generated`);
+    const ex = P.engine(P.requestText(n <= 6 ? 'exact' : 'play', n <= 6 ? { cap: 5000000 } : { budget: 100000 }));
+    same(ex.status, 'explores', `${family} n=${n}: the engine says A_2x4n explores ${P.state.edges.map(([u, v]) => u + '-' + v).join(',')}`);
+    run(5000);
+    same([P.state.play.done && P.state.play.done.kind, P.playPaperStatus(P.state.play).outcome], ['stopped', 'explores'], `${family} n=${n}: the page's own play with A_2x4n explores`);
+    plays++;
+  }
+  check(plays >= 25, `${plays} random graphs played with A_2x4n`);
+}
+// one agent again: the colours and the rule of before come back (the page must not take A_2x4n for a one-agent rule)
+Object.assign(P.state, { k: 5, def: 'sigma', agents: 1, back: null, twoRule: 'a2c5', table: new Map(), algoSrc: '', algo: null, algoError: null });
+P.applyAgents(2); P.setTwoRule('a2c4n'); P.applyAgents(1);
+same([P.state.agents, P.state.def, P.state.k], [1, 'sigma', 5], 'one agent again after A_2x4n: the rule and the colours of before');
 
 console.log(bad === 0 ? 'page play ok (the real page script, the real engine)' : `${bad} problem(s)`);
 process.exitCode = bad === 0 ? 0 : 1; // not process.exit(): it can cut off piped output (and trips a libuv assertion on Windows)

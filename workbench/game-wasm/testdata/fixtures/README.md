@@ -11,6 +11,11 @@ The `joint_*` fixtures are for the rule a2c4 (two agents acting together): the d
 play of the path, three `step` answers (the start, an accepted and a rejected candidate, and the terminating rule 11) derived by
 hand, and the refusals.
 
+The `nbr_*` fixtures are for the rule a2c4n (two agents that do not communicate): the diamond and the triangle with a pendant vertex
+explored by every adversary (67 and 62 positions, the counts of the independent checker), the 16-step play of the path, four `step`
+answers derived by hand (the start rule of Agent 2, Agent 1 following, a probed vertex that touches the path twice and is marked head,
+and Agent 1 stopping), and the refusals (`answer`, a table, too few colours).
+
 The answers were produced by the native tool and reviewed by hand. The two large ones reproduce the numbers of
 the engine's own tests (sigma* explores Sketch I in 1,601,969 positions; flipsweep5d fails it in 1,291,525).
 

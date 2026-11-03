@@ -380,7 +380,7 @@ fn two_agents_play_and_answer() {
 #[test]
 fn two_agents_refuse_what_is_for_one_agent() {
     for (args, text) in [
-        (vec!["exact", "--graph", PATH4, "--agents", "2", "--rule", "aus5"], "two agents run the rule a2c5 or a2c4, not aus5"),
+        (vec!["exact", "--graph", PATH4, "--agents", "2", "--rule", "aus5"], "two agents run the rule a2c5, a2c4 or a2c4n, not aus5"),
         (vec!["walks", "--graph", PATH4, "--agents", "2"], "`walks` is for one agent"),
         (vec!["exact", "--graph", PATH4, "--rule", "a2c5"], "a2c5 is a two-agent rule: add --agents 2"),
         (vec!["exact", "--graph", PATH4, "--agents", "3"], "--agents must be between 1 and 2"),
@@ -425,4 +425,34 @@ fn two_agents_that_act_together_run_the_four_colour_sheet() {
     assert_eq!(code(&one), 64);
     assert!(stderr(&one).contains("a2c4 is a two-agent rule: add --agents 2"), "{}", stderr(&one));
     assert!(stdout(&run(&["--help"])).contains("a2c4"), "--help does not mention a2c4");
+}
+
+#[test]
+fn two_agents_that_do_not_communicate_run_the_neighbour_sheet() {
+    // the diamond from a tip is explored by every adversary
+    let two = run(&["exact", "--graph", DIAMOND, "--agents", "2", "--rule", "a2c4n", "--summary"]);
+    assert_eq!(code(&two), 0, "{}", stdout(&two));
+    assert_eq!(stdout(&two).trim(), "explores (paper model, 2 agents), 67 positions, stopped on vertex 2");
+    // the rule brings its own number of colours and request lines
+    let req = stdout(&run(&["exact", "--graph", DIAMOND, "--agents", "2", "--rule", "a2c4n", "--request"]));
+    for line in ["agents 2", "default a2c4n", "k 4"] {
+        assert!(req.lines().any(|l| l == line), "{}: {}", line, req);
+    }
+    // a play of the path: 16 steps, one agent each (the hand trace in two.rs)
+    let o = run(&["play", "--graph", "3 0 0-1,1-2", "--agents", "2", "--rule", "a2c4n"]);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    let json = stdout(&o);
+    assert!(json.contains("\"stopped_at\":0"), "{}", json);
+    assert_eq!(json.matches("{\"agent\":").count(), 16, "the hand trace of the path has 16 steps");
+    // the two agents run different rules, so one row has no single answer
+    let a = run(&["answer", "--agents", "2", "--rule", "a2c4n", "--row", "0.2000@h"]);
+    assert!(stdout(&a).contains("no single answer"), "{}", stdout(&a));
+    // one colour fewer is an error that names the rule and its number; the rule is for two agents only
+    let few = run(&["exact", "--graph", PATH4, "--agents", "2", "--rule", "a2c4n", "--k", "3", "--summary"]);
+    assert_eq!(code(&few), 64);
+    assert!(stdout(&few).starts_with("error: a2c4n needs 4 colours"), "{}", stdout(&few));
+    let one = run(&["exact", "--graph", PATH4, "--rule", "a2c4n"]);
+    assert_eq!(code(&one), 64);
+    assert!(stderr(&one).contains("a2c4n is a two-agent rule: add --agents 2"), "{}", stderr(&one));
+    assert!(stdout(&run(&["--help"])).contains("a2c4n"), "--help does not mention a2c4n");
 }

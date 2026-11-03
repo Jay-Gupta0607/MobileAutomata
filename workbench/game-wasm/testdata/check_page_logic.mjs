@@ -62,8 +62,8 @@ for (const key of ['agen6', 'atc3', 'ac4', 'aus5']) {
   check(rules[0] === null && rules.slice(1).every((t) => typeof t === 'string' && t.length > 10), `${key}: every rule has a description, and index 0 is unused`);
   check(algoOfCode(tpl.slice(open.length)) === key, `${key}: the template is recognised by its first comment line`);
 }
-same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.rules.length - 1])), { agen6: 11, atc3: 11, ac4: 14, aus5: 19, a2c5: 21, a2c4: 19 }, "the number of rules of each algorithm is the paper's (D1-D11, C1-C14, U1-U19), T1-T21 for the two-agent A_2x5 and the 19 cases R1-R11 of A_2x4");
-same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.colours.length])), { agen6: 6, atc3: 3, ac4: 4, aus5: 5, a2c5: 5, a2c4: 4 }, 'and so is the number of colours');
+same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.rules.length - 1])), { agen6: 11, atc3: 11, ac4: 14, aus5: 19, a2c5: 21, a2c4: 19, a2c4n: 13 }, "the number of rules of each algorithm is the paper's (D1-D11, C1-C14, U1-U19), T1-T21 for the two-agent A_2x5, the 19 cases R1-R11 of A_2x4 and the 13 rules (4 + 9) of A_2x4n");
+same(Object.fromEntries(Object.entries(PAPER_ALGOS).map(([key, a]) => [key, a.colours.length])), { agen6: 6, atc3: 3, ac4: 4, aus5: 5, a2c5: 5, a2c4: 4, a2c4n: 4 }, 'and so is the number of colours');
 same(Object.keys(PAPER_ALGOS).every((key) => COLOUR_NEED[key].exact && COLOUR_NEED[key].n === PAPER_ALGOS[key].colours.length), true, "COLOUR_NEED states each algorithm's colour count");
 same([colourLabel(0, 'agen6'), colourLabel(3, 'agen6'), colourLabel(5, 'agen6')], ['init', 'head1', 'neigh'], 'named colours');
 same([colourLabel(1, 'atc3'), colourLabel(2, 'ac4'), colourLabel(4, 'aus5')], ['l0', 'front', 'head'], 'named colours of the other algorithms');
@@ -81,7 +81,8 @@ same([stepsDue(0, 130, 2000), stepsDue(50, 130, 2000), stepsDue(130, 130, 2000),
 same([stepsDue(-5, 130, 2000), stepsDue(NaN, 130, 2000), stepsDue(Infinity, 130, 2000), stepsDue(500, 0, 2000), stepsDue(500, NaN, 2000)], [1, 1, 1, 1, 1], 'a clock that makes no sense still gives one step');
 
 // 2a-ii. with two agents the colour count chooses the rule: five colours A_2x5, four A_2x4, any other number leaves the rule as it is
-same([twoRuleForColours(5, 'a2c4'), twoRuleForColours(4, 'a2c5'), twoRuleForColours(5, 'a2c5'), twoRuleForColours(4, 'a2c4')], ['a2c5', 'a2c4', 'a2c5', 'a2c4'], 'five colours are A_2x5, four are A_2x4, whatever rule was in use');
+same([twoRuleForColours(5, 'a2c4'), twoRuleForColours(4, 'a2c5'), twoRuleForColours(5, 'a2c5'), twoRuleForColours(4, 'a2c4')], ['a2c5', 'a2c4', 'a2c5', 'a2c4'], 'five colours are A_2x5, four are A_2x4 (unless A_2x4n is in use), whatever rule was in use');
+same([twoRuleForColours(4, 'a2c4n'), twoRuleForColours(5, 'a2c4n'), twoRuleForColours(3, 'a2c4n'), twoRuleForColours(6, 'a2c4n'), twoRuleForColours(4, 'a2c5')], ['a2c4n', 'a2c5', 'a2c4n', 'a2c4n', 'a2c4'], 'four colours leave A_2x4n in use, five bring A_2x5, another number leaves it, and from A_2x5 four bring A_2x4');
 same([2, 3, 6].flatMap((k) => ['a2c5', 'a2c4'].map((rule) => twoRuleForColours(k, rule))), ['a2c5', 'a2c4', 'a2c5', 'a2c4', 'a2c5', 'a2c4'], 'two, three or six colours leave the rule in use as it is');
 same(['a2c5', 'a2c4'].map((rule) => twoRuleForColours(COLOUR_NEED[rule].n, 'x')), ['a2c5', 'a2c4'], "each two-agent rule is the one for its own number of colours (COLOUR_NEED), so the two stay in step");
 check(html.includes("$('#k').addEventListener('change', (e) => { const rule = state.def, dropped = chooseColours("), 'the colour picker of the page calls chooseColours');
@@ -97,7 +98,7 @@ same(colourHint('flipsweep4', 4), { text: 'flipsweep4 needs at least 4 colours',
 same(colourHint('flipsweep5', 4), { text: 'flipsweep5 needs at least 5 colours (now 4)', warn: true }, 'a minimum that is not met');
 same([colourHint('flipsweep5', 6).warn, colourHint('chase3', 2).warn, colourHint('eat3', 3).warn], [false, true, false], 'the boundary is k = n');
 same([colourHint('sigma', 2), colourHint('none', 5), colourHint('sweep', 3), colourHint(null, 6), colourHint('chasewhite', 2)], [null, null, null, null, null], 'rules that work with any number have no hint');
-same(Object.keys(COLOUR_NEED).sort(), ['a2c4', 'a2c5', 'ac4', 'agen6', 'atc3', 'aus5', 'chase3', 'eat3', 'flipsweep4', 'flipsweep4b', 'flipsweep5', 'flipsweep5d'], 'the rules with a stated need');
+same(Object.keys(COLOUR_NEED).sort(), ['a2c4', 'a2c4n', 'a2c5', 'ac4', 'agen6', 'atc3', 'aus5', 'chase3', 'eat3', 'flipsweep4', 'flipsweep4b', 'flipsweep5', 'flipsweep5d'], 'the rules with a stated need');
 // the two-agent A_2x5 has no code template (the code editor is for one agent), so its descriptions and tags are checked here
 check(PAPER_ALGOS.a2c5.rules[0] === null && PAPER_ALGOS.a2c5.rules.slice(1).every((t) => typeof t === 'string' && t.length > 10), 'A_2x5: every rule has a description, and index 0 is unused');
 same([ruleTag('a2c5', 5), ruleTag('a2c5', 21), colourLabel(4, 'a2c5'), colourLabel(2, 'a2c5'), colourHint('a2c5', 5), colourHint('a2c5', 4)], ['T5', 'T21', 'head', 'neigh', { text: 'A_2x5 needs 5 colours', warn: false }, { text: 'A_2x5 needs 5 colours (now 4)', warn: true }], 'A_2x5: rule tags, colour names and the colour hint');
@@ -105,6 +106,11 @@ same([ruleTag('a2c5', 5), ruleTag('a2c5', 21), colourLabel(4, 'a2c5'), colourLab
 check(PAPER_ALGOS.a2c4.rules[0] === null && PAPER_ALGOS.a2c4.rules.slice(1).every((t) => typeof t === 'string' && t.length > 10), 'A_2x4: every case has a description, and index 0 is unused');
 same(PAPER_ALGOS.a2c4.tags.slice(1), ['R1', 'R2', 'R3a', 'R3b', 'R3c', 'R4a', 'R4b', 'R4c', 'R5a', 'R5b', 'R6a', 'R6b', 'R6c', 'R7', 'R8', 'R9a', 'R9b', 'R10', 'R11'], 'A_2x4: the cases are named as on the sheet');
 same([ruleTag('a2c4', 1), ruleTag('a2c4', 8), ruleTag('a2c4', 19), colourLabel(1, 'a2c4'), colourLabel(3, 'a2c4'), colourHint('a2c4', 4), colourHint('a2c4', 3)], ['R1', 'R4c', 'R11', 'head', 'fin', { text: 'A_2x4 needs 4 colours', warn: false }, { text: 'A_2x4 needs 4 colours (now 3)', warn: true }], 'A_2x4: rule tags, colour names and the colour hint');
+// A_2x4n (non communicating): the engine numbers its 13 rules in the order of the sheet, 4 for Agent 1 and then 9 for Agent 2; the colours are those of A_2x4
+check(PAPER_ALGOS.a2c4n.rules[0] === null && PAPER_ALGOS.a2c4n.rules.slice(1).every((t) => typeof t === 'string' && t.length > 10), 'A_2x4n: every rule has a description, and index 0 is unused');
+same(PAPER_ALGOS.a2c4n.tags.slice(1), ['A1·i', 'A1·ii', 'A1·iii', 'A1·iv', 'A2·I.i', 'A2·I.ii', 'A2·I.iii', 'A2·P', 'A2·F.i', 'A2·F.ii', 'A2·H.i', 'A2·H.ii', 'A2·H.iii'], 'A_2x4n: the rules are named by agent, colour and line, as on the sheet');
+same([ruleTag('a2c4n', 1), ruleTag('a2c4n', 5), ruleTag('a2c4n', 13), colourLabel(1, 'a2c4n'), colourLabel(3, 'a2c4n'), colourHint('a2c4n', 4), colourHint('a2c4n', 3)], ['A1·i', 'A2·I.i', 'A2·H.iii', 'head', 'fin', { text: 'A_2x4n needs 4 colours', warn: false }, { text: 'A_2x4n needs 4 colours (now 3)', warn: true }], 'A_2x4n: rule tags, colour names and the colour hint');
+same(PAPER_ALGOS.a2c4n.colours, PAPER_ALGOS.a2c4.colours, 'A_2x4n uses the colours of A_2x4');
 
 // 2c. the random graph option: every size gives a connected graph the engine accepts, and a layout that can be read
 const seeded = (seed) => () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; // mulberry32

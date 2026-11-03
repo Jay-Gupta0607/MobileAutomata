@@ -88,8 +88,8 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
     <button type="button" data-mode="start" aria-pressed="false" title="Click a vertex to make it the start (S)">Set start</button>
   </div>
   <div class="group"><label for="k">colours</label><select id="k"><option>2</option><option>3</option><option>4</option><option selected>5</option><option>6</option></select><span id="khint" class="khint" role="status"></span></div>
-  <div class="group"><label for="agents">agents</label><select id="agents" title="One agent, or two that see each other and run a built-in rule: A_2x5 (take turns, five colours) or A_2x4 (act together, four colours)"><option value="1" selected>1</option><option value="2">2</option></select><span id="ahint" class="khint" role="status"></span></div>
-  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I</option><option value="sketch2">Sketch II</option><option value="paw">paw + pendant</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="atc3cycle" title="Selects the rule A_TC3 and three colours">A_TC3 · 5-cycle</option><option value="atc3tree" title="Selects the rule A_TC3 and three colours">A_TC3 · binary tree</option><option value="ac4fig2a" title="Selects the rule A_C4 and four colours">A_C4 · bridge + 4-cycle</option><option value="ac4fig2b" title="Selects the rule A_C4 and four colours">A_C4 · K3,2</option><option value="aus5k4" title="Selects the rule A_US5 and five colours">A_US5 · K4</option><option value="aus5k4tail" title="Selects the rule A_US5 and five colours">A_US5 · K4 with a tail</option><option value="a2path" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · path</option><option value="a2diamond" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · diamond</option><option value="a2k4" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · K4</option><option value="a2sketch1" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · Sketch I</option><option value="a4path" title="Selects two agents, the rule A_2x4 and four colours">A_2x4 · two agents · path</option><option value="a4rich" title="Selects two agents, the rule A_2x4 and four colours">A_2x4 · two agents · triangle with two leaves</option><option value="a4diamond" title="Selects two agents, the rule A_2x4 and four colours">A_2x4 · two agents · diamond</option><option value="a4wheel" title="Selects two agents, the rule A_2x4 and four colours">A_2x4 · two agents · wheel</option><option value="clear">empty canvas</option></select></div>
+  <div class="group"><label for="agents">agents</label><select id="agents" title="One agent, or two that see each other and run a built-in rule: A_2x5 (take turns, five colours), A_2x4 (act together, four colours: communicating) or A_2x4n (separate rules, four colours: non communicating)"><option value="1" selected>1</option><option value="2">2</option></select><span id="ahint" class="khint" role="status"></span></div>
+  <div class="group"><label for="preset">preset</label><select id="preset"><option value="">choose…</option><option value="sketch1">Sketch I</option><option value="sketch2">Sketch II</option><option value="paw">paw + pendant</option><option value="c4p">C4 with two pendants</option><option value="ladder4">ladder L4 with corner pendants</option><option value="agen6path" title="Selects the rule A_Gen6 and six colours">A_Gen6 · path</option><option value="agen6triangle" title="Selects the rule A_Gen6 and six colours">A_Gen6 · triangle</option><option value="agen6tree" title="Selects the rule A_Gen6 and six colours">A_Gen6 · tree</option><option value="agen6sketch1" title="Selects the rule A_Gen6 and six colours">A_Gen6 · Sketch I</option><option value="atc3cycle" title="Selects the rule A_TC3 and three colours">A_TC3 · 5-cycle</option><option value="atc3tree" title="Selects the rule A_TC3 and three colours">A_TC3 · binary tree</option><option value="ac4fig2a" title="Selects the rule A_C4 and four colours">A_C4 · bridge + 4-cycle</option><option value="ac4fig2b" title="Selects the rule A_C4 and four colours">A_C4 · K3,2</option><option value="aus5k4" title="Selects the rule A_US5 and five colours">A_US5 · K4</option><option value="aus5k4tail" title="Selects the rule A_US5 and five colours">A_US5 · K4 with a tail</option><option value="a2path" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · path</option><option value="a2diamond" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · diamond</option><option value="a2k4" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · K4</option><option value="a2sketch1" title="Selects two agents, the rule A_2x5 and five colours">A_2x5 · two agents · Sketch I</option><option value="a4path" title="Selects two agents, the rule A_2x4 (communicating) and four colours">A_2x4 communicating · two agents · path</option><option value="a4rich" title="Selects two agents, the rule A_2x4 (communicating) and four colours">A_2x4 communicating · two agents · triangle with two leaves</option><option value="a4diamond" title="Selects two agents, the rule A_2x4 (communicating) and four colours">A_2x4 communicating · two agents · diamond</option><option value="a4wheel" title="Selects two agents, the rule A_2x4 (communicating) and four colours">A_2x4 communicating · two agents · wheel</option><option value="a4npath" title="Selects two agents, the rule A_2x4n (non communicating) and four colours">A_2x4n non communicating · two agents · path</option><option value="a4ntri" title="Selects two agents, the rule A_2x4n (non communicating) and four colours">A_2x4n non communicating · two agents · triangle</option><option value="a4ntail" title="Selects two agents, the rule A_2x4n (non communicating) and four colours">A_2x4n non communicating · two agents · triangle with a pendant</option><option value="a4ndiamond" title="Selects two agents, the rule A_2x4n (non communicating) and four colours">A_2x4n non communicating · two agents · diamond</option><option value="a4nwheel" title="Selects two agents, the rule A_2x4n (non communicating) and four colours">A_2x4n non communicating · two agents · wheel</option><option value="clear">empty canvas</option></select></div>
   <div class="group" style="flex-wrap:wrap"><label for="rn">random graph</label><input type="number" id="rn" value="10" min="2" max="32" step="1" style="width:64px" title="How many vertices: 2 to 32"><select id="rfam" aria-label="family of graph" style="max-width:200px" title="Which family of graph to generate. In brackets: the first algorithm of the papers that is guaranteed to explore it; the algorithms with more colours (A_TC3, A_C4, A_US5, A_Gen6) are guaranteed too."><option value="any" selected>any connected graph (A_Gen6)</option><option value="ktf">clique / triangle-free blocks (A_US5)</option><option value="cb">cycle / K(p,q) blocks (A_C4)</option><option value="cactus">cactus (A_C4)</option><option value="tree">tree (A_TC3)</option><option value="cycle">simple cycle (A_TC3)</option></select><button type="button" id="b-random" title="Replace the canvas with a new random graph of this family and size">Generate</button></div>
   <div class="group"><button type="button" id="b-import-graph">Import / export graph</button></div>
   <div class="group small" id="wasm-status">loading engine…</div>
@@ -124,7 +124,7 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--rule);border-r
     <section class="panel" id="panel-rules">
       <div id="rules-two" hidden>
         <h2>Two agents</h2>
-        <div class="row"><label class="small" for="two-rule">rule</label><select id="two-rule" title="The built-in rule the two agents run"><option value="a2c5">A_2x5 · take turns · five colours</option><option value="a2c4">A_2x4 · act together · four colours</option></select></div>
+        <div class="row"><label class="small" for="two-rule">rule</label><select id="two-rule" title="The built-in rule the two agents run"><option value="a2c5">A_2x5 · take turns · five colours</option><option value="a2c4">A_2x4 · act together · four colours · communicating</option><option value="a2c4n">A_2x4n · separate rules · four colours · non communicating</option></select></div>
         <p class="note" id="two-intro"></p>
         <h2>The model</h2>
         <ul class="note" id="two-model"></ul>
@@ -198,7 +198,8 @@ const $ = (s) => document.querySelector(s);
 const PAL = ['var(--c0)', 'var(--c1)', 'var(--c2)', 'var(--c3)', 'var(--c4)', 'var(--c5)'];
 // An algorithm may choose its own colours by name: A_2x4 (colours init, head, path, fin) draws the path red and the fin green; `white` lists the
 // colours whose vertex letter is white.  Every other rule keeps the palette above, by colour number.
-const ALGO_PAL = { a2c4: { colours: ['var(--c0)', 'var(--c1)', 'var(--cred)', 'var(--cgreen)'], white: [2, 3] } };
+const A2C4_PAL = { colours: ['var(--c0)', 'var(--c1)', 'var(--cred)', 'var(--cgreen)'], white: [2, 3] };
+const ALGO_PAL = { a2c4: A2C4_PAL, a2c4n: A2C4_PAL };
 function palOf(c) { const a = activeAlgo(), p = a && ALGO_PAL[a]; return (p && p.colours[c]) || PAL[c]; }
 function whiteInk(c) { const a = activeAlgo(), p = a && ALGO_PAL[a]; return p ? p.white.includes(c) : c === 3 || c === 4 || c === 5; }
 const CNAME = ['white', 'colour 1', 'colour 2', 'colour 3', 'colour 4', 'colour 5'];
@@ -322,6 +323,26 @@ const A2C4_RULES = [null,
   'both on one fin vertex with no head neighbour: both paint it head',
   'a fin vertex and a head vertex side by side: the head vertex becomes init and its agent moves onto its partner',
   'both on one vertex of any colour with only fin around (checked before all the others): both paint it fin and stop'];
+// A_2x4n: the four-colour sheet for two agents that do NOT COMMUNICATE: Agent 1 and Agent 2 run separate rule lists and each acts alone, on its own vertex's
+// colour, the colours of its neighbours and where the other agent is (on its own vertex, or on a neighbour: then which one, and that vertex's colour).
+// Thirteen rules in the order of the sheet: 1-4 are Agent 1's (it acts on path vertices only), 5-13 Agent 2's; an agent no rule applies to waits.  The page
+// names Agent 1 "A" and Agent 2 "B".  The colours are those of A_2x4.
+const A2C4N_COLOURS = A2C4_COLOURS;
+const A2C4N_TAGS = [null, 'A1·i', 'A1·ii', 'A1·iii', 'A1·iv', 'A2·I.i', 'A2·I.ii', 'A2·I.iii', 'A2·P', 'A2·F.i', 'A2·F.ii', 'A2·H.i', 'A2·H.ii', 'A2·H.iii'];
+const A2C4N_RULES = [null,
+  'Agent 1, on a path vertex with Agent 2 on a path vertex next door: follow it onto its vertex',
+  'Agent 1, together with Agent 2 on a path vertex that has a path neighbour and no init neighbour: finish it (fin) and step back to a path neighbour',
+  'Agent 1, on a path vertex with Agent 2 on a fin vertex next door: become the head (stay)',
+  'Agent 1, together with Agent 2 on a path vertex with only fin around: finish it (fin) and stop',
+  'Agent 2, together with Agent 1 on an init vertex whose neighbours are all init (the start): become path and enter an init neighbour',
+  'Agent 2, on an init vertex with Agent 1 on a path vertex next door and no other path neighbour: become path (the path grows here)',
+  'Agent 2, on an init vertex with Agent 1 on a path vertex next door and another path neighbour (a chord): become head (a mark) and go back onto Agent 1',
+  'Agent 2, together with Agent 1 on a path vertex that has an init neighbour: probe it (go to an init neighbour)',
+  'Agent 2, on a fin vertex with Agent 1 on a head vertex next door: go onto Agent 1',
+  'Agent 2, together with Agent 1 on a fin vertex: stop',
+  'Agent 2, together with Agent 1 on a head vertex that has a head neighbour (a mark): go to the mark',
+  'Agent 2, on a head vertex with Agent 1 on a head vertex next door: become init again (clean up the mark) and go back onto Agent 1',
+  'Agent 2, together with Agent 1 on a head vertex with no head neighbour: become path'];
 // By key (the name used in requests, `default NAME`): the colour names, the rule descriptions and the letter the paper puts
 // before a rule number (none for A_Gen6; T for the two-agent A_2x5; R for A_2x4, whose cases are named by `tags`).
 const PAPER_ALGOS = {
@@ -330,7 +351,8 @@ const PAPER_ALGOS = {
   ac4: { colours: AC4_COLOURS, rules: AC4_RULES, prefix: 'C' },
   aus5: { colours: AUS5_COLOURS, rules: AUS5_RULES, prefix: 'U' },
   a2c5: { colours: A2C5_COLOURS, rules: A2C5_RULES, prefix: 'T' }, // two agents, taking turns
-  a2c4: { colours: A2C4_COLOURS, rules: A2C4_RULES, prefix: 'R', tags: A2C4_TAGS }, // two agents, acting together
+  a2c4: { colours: A2C4_COLOURS, rules: A2C4_RULES, prefix: 'R', tags: A2C4_TAGS }, // two agents, acting together (communicating)
+  a2c4n: { colours: A2C4N_COLOURS, rules: A2C4N_RULES, prefix: 'N', tags: A2C4N_TAGS }, // two agents, separate rule lists (non communicating)
 };
 function paperAlgo(key) { return Object.prototype.hasOwnProperty.call(PAPER_ALGOS, key) ? PAPER_ALGOS[key] : null; }
 // The label of colour c: its name when the algorithm in use names its colours (a colour beyond its list is unused), else
@@ -364,7 +386,7 @@ function paperStatus(v) {
 // papers exactly their number (more colours are left unused), some built-in rules at least so many; the other rules
 // work with any number and are not listed.
 const COLOUR_NEED = {
-  a2c5: { n: 5, exact: true, name: 'A_2x5' }, a2c4: { n: 4, exact: true, name: 'A_2x4' },
+  a2c5: { n: 5, exact: true, name: 'A_2x5' }, a2c4: { n: 4, exact: true, name: 'A_2x4' }, a2c4n: { n: 4, exact: true, name: 'A_2x4n' },
   agen6: { n: 6, exact: true, name: 'A_Gen6' },
   atc3: { n: 3, exact: true, name: 'A_TC3' }, ac4: { n: 4, exact: true, name: 'A_C4' }, aus5: { n: 5, exact: true, name: 'A_US5' },
   flipsweep4: { n: 4, name: 'flipsweep4' }, flipsweep4b: { n: 4, name: 'flipsweep4b' },
@@ -379,9 +401,12 @@ function colourHint(rule, k) {
   if (k < need.n) return { text: `${text} (now ${k})`, warn: true };
   return { text: need.exact && k > need.n ? `${text} (the other ${k - need.n} unused)` : text, warn: false };
 }
-// With two agents the number of colours and the rule go together: five colours are A_2x5 (taking turns), four are A_2x4 (acting
-// together).  Any other number leaves the rule in use (`current`, a key) as it is; the colour hint says when it has too few.
-function twoRuleForColours(k, current) { return ['a2c5', 'a2c4'].find((rule) => COLOUR_NEED[rule].n === k) || current; }
+// The rules two agents can run, in the order of the rule chooser: A_2x5 (taking turns, five colours), A_2x4 (acting together = communicating, four
+// colours) and A_2x4n (separate rule lists = non communicating, four colours).
+const TWO_RULES = ['a2c5', 'a2c4', 'a2c4n'];
+// With two agents the number of colours and the rule go together: five colours are A_2x5, four are A_2x4 or A_2x4n (the one in use stays if it is
+// one of them, else A_2x4).  Any other number leaves the rule in use (`current`, a key) as it is; the colour hint says when it has too few.
+function twoRuleForColours(k, current) { const fit = TWO_RULES.filter((rule) => COLOUR_NEED[rule].n === k); return fit.includes(current) ? current : fit[0] || current; }
 // Random graphs, from the families the algorithms of the papers are built for, each inside the next: trees and simple cycles
 // (A_TC3), cacti and graphs whose blocks are cycles or complete bipartite graphs (A_C4), graphs whose blocks are cliques or
 // triangle-free (A_US5), and all connected graphs (A_Gen6).  `from` is the first algorithm guaranteed to explore the family; the
@@ -612,7 +637,7 @@ function runInWorker(text) { return new Promise(async (res) => { await workerRea
 const state = {
   k: 5, nodes: [], edges: [], start: 0, mode: 'node', edgeFrom: null, drag: null,
   agents: 1, back: null, // agents: 1 or 2; back: the one-agent colours, rule and code, kept while two agents are chosen
-  twoRule: 'a2c5',       // the built-in rule two agents run: a2c5 (take turns) or a2c4 (act together); state.def holds it while agents is 2
+  twoRule: 'a2c5',       // the built-in rule two agents run: a2c5 (take turns), a2c4 (act together: communicating) or a2c4n (separate rule lists: non communicating); state.def holds it while agents is 2
   table: new Map(), // rowText -> {paint, target}
   def: 'none', sweep: [0, 4, 0],
   algo: null, // {src, table: Map, maxDeg, errors}
@@ -654,6 +679,13 @@ PRESETS.a4path = { text: '3 0 0-1,1-2', k: 4, def: 'a2c4', agents: 2, coords: [[
 PRESETS.a4rich = { text: '5 2 0-1,0-2,0-4,1-2,1-3', k: 4, def: 'a2c4', agents: 2, coords: [[330,250],[670,250],[500,470],[880,170],[120,170]], box: [1000, 640] };
 PRESETS.a4diamond = { text: '4 2 0-1,0-2,0-3,1-2,1-3', k: 4, def: 'a2c4', agents: 2, coords: [[500,170],[500,470],[200,320],[800,320]], box: [1000, 640] };
 PRESETS.a4wheel = { text: '5 4 0-1,0-2,0-3,0-4,1-3,1-4,2-3,2-4', k: 4, def: 'a2c4', agents: 2, coords: [[500,320],[500,110],[500,530],[760,320],[240,320]], box: [1000, 640] };
+// A_2x4n, two agents that do not communicate, four colours: the path (10 of the 13 rules fire), the triangle (the smallest graph on which all 13 fire:
+// the probed vertex touches the path twice, is marked head, and the mark is cleaned up), the triangle with a pendant vertex, the diamond and the wheel.
+PRESETS.a4npath = { text: '3 0 0-1,1-2', k: 4, def: 'a2c4n', agents: 2, coords: [[200,320],[500,320],[800,320]], box: [1000, 640] };
+PRESETS.a4ntri = { text: '3 0 0-1,1-2,0-2', k: 4, def: 'a2c4n', agents: 2, coords: [[500,170],[280,470],[720,470]], box: [1000, 640] };
+PRESETS.a4ntail = { text: '4 0 0-1,1-2,0-2,2-3', k: 4, def: 'a2c4n', agents: 2, coords: [[300,470],[300,170],[600,320],[850,320]], box: [1000, 640] };
+PRESETS.a4ndiamond = { text: '4 2 0-1,0-2,0-3,1-2,1-3', k: 4, def: 'a2c4n', agents: 2, coords: [[500,170],[500,470],[200,320],[800,320]], box: [1000, 640] };
+PRESETS.a4nwheel = { text: '5 4 0-1,0-2,0-3,0-4,1-3,1-4,2-3,2-4', k: 4, def: 'a2c4n', agents: 2, coords: [[500,320],[500,110],[500,530],[760,320],[240,320]], box: [1000, 640] };
 
 function graphText() { return `${state.nodes.length} ${state.start} ${state.edges.map(([u, v]) => u + '-' + v).join(',')}`; }
 function adjOf(v) { const out = []; for (const [a, b] of state.edges) { if (a === v) out.push(b); else if (b === v) out.push(a); } return out; }
@@ -991,7 +1023,7 @@ function bagChips(rowText) {
 // ------------------------------------------------------------ persistence (per-browser convenience only)
 function save() { state.tableStops = undefined; try { localStorage.setItem('cew.state', JSON.stringify({ k: state.k, nodes: state.nodes, edges: state.edges, start: state.start, table: [...state.table.entries()], def: state.def, sweep: state.sweep, algoSrc: state.algoSrc, agents: state.agents, back: state.back, twoRule: state.twoRule })); } catch (e) { /* storage unavailable */ } }
 function restore() {
-  try { const s = JSON.parse(localStorage.getItem('cew.state') || 'null'); if (!s || !s.nodes || !s.nodes.length) return false; state.k = s.k || 5; state.nodes = s.nodes; state.edges = s.edges || []; state.start = s.start || 0; state.table = new Map(s.table || []); state.def = s.def || 'none'; state.sweep = s.sweep || [0, 4, 0]; state.algoSrc = s.algoSrc || ''; state.agents = s.agents === 2 ? 2 : 1; state.back = s.back || null; state.twoRule = s.twoRule === 'a2c4' ? 'a2c4' : 'a2c5'; if (state.agents === 2) { state.def = state.twoRule; state.algoSrc = ''; } return true; } catch (e) { return false; }
+  try { const s = JSON.parse(localStorage.getItem('cew.state') || 'null'); if (!s || !s.nodes || !s.nodes.length) return false; state.k = s.k || 5; state.nodes = s.nodes; state.edges = s.edges || []; state.start = s.start || 0; state.table = new Map(s.table || []); state.def = s.def || 'none'; state.sweep = s.sweep || [0, 4, 0]; state.algoSrc = s.algoSrc || ''; state.agents = s.agents === 2 ? 2 : 1; state.back = s.back || null; state.twoRule = TWO_RULES.includes(s.twoRule) ? s.twoRule : 'a2c5'; if (state.agents === 2) { state.def = state.twoRule; state.algoSrc = ''; } return true; } catch (e) { return false; }
 }
 
 // ------------------------------------------------------------ play
@@ -1147,7 +1179,8 @@ function renderColourHint() {
   const h = colourHint(rule, state.k), el = $('#khint');
   el.textContent = h ? h.text : ''; el.className = 'khint' + (h && h.warn ? ' warn' : '');
 }
-function renderAgentHint() { $('#agents').value = String(state.agents); $('#ahint').textContent = state.agents === 2 ? (state.def === 'a2c4' ? 'two agents act together' : 'two agents see each other') : ''; }
+const AGENT_HINT = { a2c5: 'two agents see each other', a2c4: 'two agents act together (communicating)', a2c4n: 'two agents, separate rules (non communicating)' };
+function renderAgentHint() { $('#agents').value = String(state.agents); $('#ahint').textContent = state.agents === 2 ? AGENT_HINT[state.def] || 'two agents' : ''; }
 function render() { renderGraph(); renderPlay(); renderRules(); renderLegend(); renderHint(); renderColourHint(); renderAgentHint(); }
 // One agent or two.  Choosing two brings the rule two agents ran last (A_2x5 by default, A_2x4 if chosen) and its colours, and keeps the one-agent colours, rule and code to give back
 // when one agent is chosen again (a table is not used with two agents, and is not touched).  Callers reset the play and redraw.
@@ -1159,19 +1192,20 @@ function applyAgents(n) {
     if (state.k < COLOUR_NEED[state.def].n) state.k = COLOUR_NEED[state.def].n;
   } else {
     const b = state.back; state.back = null; state.agents = 1;
-    state.def = b && b.def !== 'a2c5' && b.def !== 'a2c4' ? b.def : 'none'; state.algoSrc = b ? b.algoSrc : ''; state.algo = null; state.algoError = null;
+    state.def = b && !TWO_RULES.includes(b.def) ? b.def : 'none'; state.algoSrc = b ? b.algoSrc : ''; state.algo = null; state.algoError = null;
     if (b) state.k = b.k;
   }
   $('#k').value = state.k; $('#agents').value = String(state.agents);
 }
-// The rule two agents run: A_2x5 (take turns, five colours) or A_2x4 (act together, four colours); it brings its number of colours.
+// The rule two agents run: A_2x5 (take turns, five colours), A_2x4 (act together = communicating, four colours) or A_2x4n (separate rule lists =
+// non communicating, four colours); it brings its number of colours.
 // Callers reset the play and redraw.
 function setTwoRule(rule) {
   state.twoRule = rule; if (state.agents === 2) state.def = rule;
   state.k = COLOUR_NEED[rule].n; $('#k').value = state.k;
 }
 // The colour picker: the palette becomes k colours.  With two agents the rule follows the number (twoRuleForColours): five colours bring A_2x5,
-// four bring A_2x4, another number leaves the rule as it is.  The table is for one agent and is not used with two, so it is left alone then.
+// four bring A_2x4 or A_2x4n (the one in use stays), another number leaves the rule as it is.  The table is for one agent and is not used with two, so it is left alone then.
 // With one agent, the rows that use colours beyond the new palette are removed.  Returns how many rows were removed.  Callers reset the play and redraw.
 function chooseColours(k) {
   state.k = k;
@@ -1191,7 +1225,9 @@ function activeAlgo() {
 }
 function namedColours() { return activeAlgo() !== null; }
 function cname(c) { return colourLabel(c, activeAlgo()); }
-function renderLegend() { $('#legend').innerHTML = [...Array(state.k).keys()].map((c) => `<span><span class="sw" style="background:${palOf(c)}"></span>${namedColours() ? cname(c) : c === 0 ? 'white' : c}</span>`).join('') + (state.agents === 2 ? `<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent A${state.def === 'a2c4' ? '' : ' (works)'}</span><span><span class="sw" style="border:3px solid var(--warn);width:10px;height:10px"></span>agent B${state.def === 'a2c4' ? ' (both act in every step)' : ' (marks, follows)'}</span>` :'<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent</span>') + '<span><span class="sw" style="border:2px dashed var(--bad)"></span>never visited</span>'; }
+// What the legend says after "agent A" and "agent B" for each two-agent rule.
+const AGENT_ROLE = { a2c5: [' (works)', ' (marks, follows)'], a2c4: ['', ' (both act in every step)'], a2c4n: [' · Agent 1 (follows)', ' · Agent 2 (leads)'] };
+function renderLegend() { $('#legend').innerHTML = [...Array(state.k).keys()].map((c) => `<span><span class="sw" style="background:${palOf(c)}"></span>${namedColours() ? cname(c) : c === 0 ? 'white' : c}</span>`).join('') + (state.agents === 2 ? `<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent A${(AGENT_ROLE[state.def] || ['', ''])[0]}</span><span><span class="sw" style="border:3px solid var(--warn);width:10px;height:10px"></span>agent B${(AGENT_ROLE[state.def] || ['', ''])[1]}</span>` :'<span><span class="sw" style="border:3px solid var(--pen);width:10px;height:10px"></span>agent</span>') + '<span><span class="sw" style="border:2px dashed var(--bad)"></span>never visited</span>'; }
 function renderHint() {
   const h = { node: 'Click on empty space to add a vertex.', edge: state.edgeFrom === null ? 'Click a vertex, then another, to join them.' : `Now click the vertex to join with ${state.edgeFrom} (click it again to cancel).`, move: 'Drag vertices to arrange the drawing.', delete: 'Click a vertex or an edge to remove it.', start: 'Click the vertex where the agent starts.' }[state.mode];
   $('#hint').textContent = h;
@@ -1325,12 +1361,23 @@ function renderPlay() {
   $('#b-step').disabled = !!p.done; $('#b-auto').disabled = !!p.done; $('#b-play').disabled = !!p.done;
 }
 function colourOptions(withStay) { let s = ''; for (let c = 0; c < state.k; c++) s += `<option value="${c}">${namedColours() ? c + ' ' + cname(c) : c === 0 ? '0 white' : c}</option>`; if (withStay) s += '<option value="-1">stay</option><option value="-2">stop (paper model)</option>'; return s; }
-// The Rules tab with two agents: the rule in use (A_2x5 or A_2x4), its model and its rules.
+// The Rules tab with two agents: the rule in use (A_2x5, A_2x4 or A_2x4n), its model and its rules.
 function renderTwoRules() {
   const joint = state.def === 'a2c4', a = paperAlgo(state.def);
   $('#two-rule').value = state.def;
+  if (state.def === 'a2c4n') { // the non communicating sheet: two rule lists, each agent acts alone
+    $('#two-intro').innerHTML = 'With two agents the rule is built in: <b>A_2x4n</b>, four colours (init, head, path, fin), <b>non communicating</b>: the two agents run separate rule lists (Agent 1 and Agent 2) and each acts alone on what it sees. The other four-colour rule, A_2x4, is the <b>communicating</b> one: there a rule reads both agents’ views and both act in the same step. Tables and code are for one agent; switch “agents” back to 1 to use them (they are kept).';
+    $('#two-model').innerHTML = `<li>Both agents start on the start vertex, every vertex white (init). They run different programs: the page names them <b>A</b> (Agent 1, who follows and backs up) and <b>B</b> (Agent 2, who leads and probes).</li>
+       <li>Each agent sees its own vertex colour, the colours of its neighbours, and the other agent: on its own vertex, or on a neighbour (it knows which neighbour, and that vertex’s colour). That is all the two share; nothing else passes between them.</li>
+       <li>A rule paints the agent’s own vertex, then stays, moves onto the other agent, moves to a neighbour of a colour (the adversary picks which), or stops. Conditions on the colours around leave out the other agent’s own vertex. An agent that no rule applies to waits.</li>
+       <li>The adversary activates one agent per step. In every position the sheet reaches only one agent has a rule that applies, so the order of activation never matters; the Analysis tab also lets the adversary choose the order.</li>
+       <li>The agents explore when every vertex is visited and both have stopped on the start vertex.</li>`;
+    $('#two-rules-h').textContent = 'The 13 rules (4 for Agent 1, 9 for Agent 2)';
+    $('#two-rules tbody').innerHTML = a.rules.slice(1).map((t, i) => `<tr><td class="mono">${ruleTag(state.def, i + 1)}</td><td style="white-space:normal">${t}</td></tr>`).join('');
+    return;
+  }
   $('#two-intro').innerHTML = joint
-    ? 'With two agents the rule is built in: <b>A_2x4</b>, four colours (init, head, path, fin), a colleague’s strategy (not from a paper). The two agents <b>act together</b>: one rule reads both agents’ views and both act in the same step. Tables and code are for one agent; switch “agents” back to 1 to use them (they are kept).'
+    ? 'With two agents the rule is built in: <b>A_2x4</b> (<b>communicating</b>), four colours (init, head, path, fin), a colleague’s strategy (not from a paper). The two agents <b>act together</b>: one rule reads both agents’ views and both act in the same step. Tables and code are for one agent; switch “agents” back to 1 to use them (they are kept).'
     : 'With two agents the rule is built in: <b>A_2x5</b>, five colours (init, path, neigh, fin, head). Tables and code are for one agent; switch “agents” back to 1 to use them (they are kept).';
   $('#two-model').innerHTML = joint
     ? `<li>Both agents start on the start vertex, every vertex white (init). They are identical and oblivious; the page names them A and B, and when they stand together A plays the first role of a rule.</li>
@@ -1488,7 +1535,7 @@ function applyPreset(v) { if (v === 'clear') { state.nodes = []; state.edges = [
   }
   state.k = pr.k; $('#k').value = pr.k; loadGraphText(pr.text, pr.coords, pr.box); }
 $('#agents').addEventListener('change', (e) => { applyAgents(+e.target.value === 2 ? 2 : 1); forgetAnalysis(); save(); resetPlay(); render(); });
-$('#two-rule').addEventListener('change', (e) => { setTwoRule(e.target.value === 'a2c4' ? 'a2c4' : 'a2c5'); forgetAnalysis(); save(); resetPlay(); render(); });
+$('#two-rule').addEventListener('change', (e) => { setTwoRule(TWO_RULES.includes(e.target.value) ? e.target.value : 'a2c5'); forgetAnalysis(); save(); resetPlay(); render(); });
 $('#b-import-graph').addEventListener('click', () => { $('#graphtext').value = graphText(); $('#graphdialog').showModal(); });
 $('#b-random').addEventListener('click', makeRandomGraph);
 $('#rn').addEventListener('keydown', (e) => { if (e.key === 'Enter') makeRandomGraph(); });

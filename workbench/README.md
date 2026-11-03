@@ -53,18 +53,23 @@ or newer.
   canvas stays as it was.  Replacing the whole graph (this option, a preset, Import) also clears the Analysis tab and
   cancels a search still running, since a result belongs to the graph it was computed for.
 * **Two agents.** The *agents* box in the header chooses one agent or two.  Two agents see each other and run a built-in
-  rule, chosen in the Rules tab: **A_2x5** (the agents take turns, five colours: init, path, neigh, fin, head) or **A_2x4**
-  (the agents act together, four colours: init, head, path, fin; a colleague's eleven-rule sheet).  The number of colours is
-  set to the rule's, and the other way round: with two agents, choosing **5 colours** in the colours box selects A_2x5 and
-  choosing **4 colours** selects A_2x4 (another number leaves the rule as it is; the hint says when it has too few colours).
+  rule, chosen in the Rules tab: **A_2x5** (the agents take turns, five colours: init, path, neigh, fin, head), **A_2x4**
+  (the agents act together, four colours: init, head, path, fin; a colleague's eleven-rule sheet; labelled *communicating*) or
+  **A_2x4n** (four colours, the same four; the agents run separate rule lists and each acts alone; labelled *non
+  communicating*).  The number of colours is set to the rule's, and the other way round: with two agents, choosing **5 colours**
+  in the colours box selects A_2x5 and choosing **4 colours** selects A_2x4, or leaves A_2x4n in use if it is the one chosen
+  (another number leaves the rule as it is; the hint says when it has too few colours).
   Tables and code are for one agent (they are kept untouched, and come back when you choose one agent again).  The
   graph shows agent A (purple ring) and agent B (amber ring).  With A_2x5 the Play tab names the agent that acts at each step
   (A works, B marks the head and follows) and the ledger tags rules T1 to T21; with A_2x4 one rule fires for the pair, both
-  agents act in the step (two ledger rows per step) and the ledger tags the sheet's cases R1 to R11 (R3a, R4c and so on).  The
+  agents act in the step (two ledger rows per step) and the ledger tags the sheet's cases R1 to R11 (R3a, R4c and so on); with
+  A_2x4n one agent acts per step (A is Agent 1, who follows and backs up; B is Agent 2, who leads and probes) and the ledger
+  tags the rules by agent, colour and line (A1·ii, A2·H.iii and so on).  The
   Rules tab lists the rules.  *Search all executions* enumerates every choice of the adversary (with A_2x5 also which agent is
   activated); the quick walks are not offered.  Presets: for A_2x5 the 17-step hand-trace path, the diamond (K4 minus an edge:
   A_US5 alone fails on it, two agents do not), K4 and Sketch I; for A_2x4 the path, the triangle with two leaves, the diamond
-  and the wheel on five vertices.  See **Two agents** below.
+  and the wheel on five vertices; for A_2x4n the path, the triangle (the smallest graph on which all 13 rules fire), the
+  triangle with a pendant vertex, the diamond and the wheel.  See **Two agents** below.
 * **Play.** *Play* steps at the speed of the slider.  Its clock is a timer inside a Web Worker rather than a timer of the
   page, and each tick does the steps that are due by the clock, so a play keeps its speed while you are in another tab
   (a browser slows the timers of a page nobody is looking at; a tick that comes late catches up instead).  A hidden
@@ -252,8 +257,9 @@ Theorem 13 of the paper requires of any three-colour rule; A_US5 on the diamond,
 
 ## Two agents (`agents 2`)
 
-A second agent changes what a rule can do, so it is a separate model, with separate rules: **A_2x5** (the agents take turns)
-and **A_2x4** (the agents act together; it differs from the model below in the scheduler only, see its own section).  These
+A second agent changes what a rule can do, so it is a separate model, with separate rules: **A_2x5** (the agents take turns),
+**A_2x4** (the agents act together, *communicating*; it differs from the model below in the scheduler only, see its own
+section) and **A_2x4n** (the agents run separate rule lists, *non communicating*; see its own section).  These
 are assumptions of this workbench, not a published model (the papers above are about one agent).  The model of A_2x5:
 
 * Two identical oblivious agents start together on the start vertex; every vertex starts in colour 0.
@@ -354,10 +360,68 @@ exhaustive up to eight vertices, not a proof for all graphs.  The fixtures `join
 WebAssembly; `check_page_play.mjs` plays the 16-step trace, an adversary's click, undo, a replay of the engine's longest
 execution and random graphs of four families up to 20 vertices through the real page script with A_2x4.
 
+### The algorithm A_2x4n (`default a2c4n`)
+
+A four-colour strategy for two agents that **do not communicate**, from a handwritten sheet of two rule lists, "Agent 1" and
+"Agent 2" (not from a paper).  The colours are those of A_2x4 (0 init, 1 head, 2 path, 3 fin).  The model is that of A_2x5
+(the adversary activates one agent per step and picks the destination among equal candidates; the agents explore when every
+vertex is visited and both have stopped on the start vertex) with these differences:
+
+* The two agents run **different rule lists**, so they are not interchangeable; the engine does not use the shortcut of A_2x5
+  (stepping only agent 0 when the agents stand together) and steps both.  The page names Agent 1 "A" and Agent 2 "B".
+* Each agent sees its own colour, the colours of its neighbours, and the other agent on its own vertex or on a neighbour: it
+  knows **which** neighbour, and that vertex's colour.  Nothing else passes between them.  When the partner is on a neighbour,
+  its vertex is left out of the conditions on the colours around (`∃A_P, ∄P` means: the partner is on a path neighbour and no
+  *other* neighbour is path).  A move "to the partner" goes onto that exact vertex.
+* An agent that no rule applies to **waits**; there is no undefined row.
+
+The rules, in the order of the sheet (the engine's rule numbers 1 to 13; `(A)` = the other agent is on this vertex, `∃A_X` = it is
+on a neighbour of colour X; the page tags them A1·i … A2·H.iii):
+
+| no. | agent, on | condition | paints, then |
+|---|---|---|---|
+| 1 | 1, path | `∃A_P` | path, moves onto the partner |
+| 2 | 1, path | `∃P, ∄I & (A)` | fin, moves to a path neighbour |
+| 3 | 1, path | `∃A_F` | head, stays |
+| 4 | 1, path | `∄I,P,H & (A)` | fin, stops |
+| 5 | 2, init | all neighbours init `& (A)` | path, moves to an init neighbour |
+| 6 | 2, init | `∃A_P, ∄P` | path, stays |
+| 7 | 2, init | `∃A_P, ∃P` | head, moves onto the partner |
+| 8 | 2, path | `∃I & (A)` | path, moves to an init neighbour |
+| 9 | 2, fin | `∃A_H` | fin, moves onto the partner |
+| 10 | 2, fin | `(A)` | fin, stops |
+| 11 | 2, head | `∃H & (A)` | head, moves to a head neighbour |
+| 12 | 2, head | `∃A_H` | init, moves onto the partner |
+| 13 | 2, head | `∄H & (A)` | path, stays |
+
+Agent 2 leads (it enters, probes and cleans up), Agent 1 follows and backs up.  A probed vertex that touches the path only where
+the partner stands joins the path (6); one that touches it elsewhere too is marked head and Agent 2 goes back onto its partner
+(7).  The pair then backs up along the path (2); when Agent 1 becomes the head (3) Agent 2 joins it (9); if a mark is next to the
+head, Agent 2 goes to it (11), turns it init again and goes back (12); with no mark left the head becomes path (13) and the
+vertex is probed afresh (8) from the nearest path vertex it touches (if it still touches an earlier one it is marked again and the
+pair backs up further).
+
+What is checked.  In the engine: rows derived by hand from the sheet; the 16-step trace of the path (`two.rs`); every
+connected graph of up to six vertices from every start vertex against every adversary (and up to seven with
+`cargo test --release -- --ignored`), with the number of positions of the exact game equal to the totals of an independent
+program written from the handwritten sheet (20, 174, 1,692, 17,913, 257,755, and 5,164,287 for seven vertices); a scan showing
+that in every position reached **at most one agent has a rule to apply** (so the order of activation never matters) and that no
+rule asks for a colour nobody has or a partner that is not next door.  With that independent program (outside this repository,
+`two-agent-neighbour-sheet`): every connected graph of up to nine vertices (261,080 graphs and 2,349,720 graph-start pairs at nine)
+from every start, with the adversary allowed any set of agents at each step; 191 graphs of the usual families; random connected
+graphs of 10 to 15 vertices (about 5,000 graphs, games of up to about 27 million positions): none failed.  This is evidence,
+not a proof for all graphs.  The sheet **needs to know which neighbour holds the partner**: if an agent learned only that the
+partner stands on *some* neighbour of colour X, the adversary would defeat it on almost every graph, already on a path of three
+vertices (the follower can step back onto the earlier path vertex).  The fixtures `nbr_*.req` hold the same answers natively and
+in WebAssembly; `check_page_play.mjs` plays the 16-step trace, the triangle (all 13 rules fire), an adversary's click, undo, a
+replay of the engine's execution, the presets and random graphs of four families up to 20 vertices through the real page script.
+
 ### In the protocol and the command line
 
-Keys: `agents 2`, `default a2c5` or `default a2c4` (required), `k` of at least 5 (a2c5) or 4 (a2c4).  A table, `model classic`
-and `cmd walks` are errors.  For `default a2c4` the answers differ as follows: `cmd step` answers
+Keys: `agents 2`, `default a2c5`, `default a2c4` or `default a2c4n` (required), `k` of at least 5 (a2c5) or 4 (a2c4, a2c4n).  A
+table, `model classic` and `cmd walks` are errors.  `default a2c4n` answers as `a2c5` does (one agent acts per step; `step` names
+it) except that `cmd answer` is refused, since the two agents run different rules.  For `default a2c4` the answers differ as
+follows: `cmd step` answers
 `{"joint":true,"step":{…},"choose":[…],"auto":…,"rule":n,"tag":"R4c",…}`, where `step` has the keys of one agent's step for the
 first role (the agent that stands on the first vertex of the rule, with `agent`, `cur`, `other`, `row`, `paint`, `target`,
 `options`, `next` and `rule`) and the second role under `second`, `paints:false` marks a role that only moves, and `choose` is
@@ -374,8 +438,10 @@ carries a `reason` as before or `stuck`.  `cmd answer` takes `row own.bag@p`.
     cargo run --bin explore -- play --agents 2 --graph "3 0 0-1,1-2" --prefer "1 2 0"
     cargo run --bin explore -- answer --agents 2 --row 4.11001@h
 
-`--agents 2` takes `a2c5` as the rule and five colours by itself, or `--rule a2c4` (four colours); a table, a `--rule` other than
-these two and the `walks` command are refused, and so is `--rule a2c5` or `--rule a2c4` without `--agents 2`:
+`--agents 2` takes `a2c5` as the rule and five colours by itself, or `--rule a2c4` or `--rule a2c4n` (four colours); a table, a
+`--rule` other than these three and the `walks` command are refused, and so is `--rule a2c5`, `a2c4` or `a2c4n` without
+`--agents 2`:
 
     cargo run --bin explore -- exact --agents 2 --rule a2c4 --graph "4 2 0-1,0-2,0-3,1-2,1-3" --summary
+    cargo run --bin explore -- exact --agents 2 --rule a2c4n --graph "4 2 0-1,0-2,0-3,1-2,1-3" --summary
 

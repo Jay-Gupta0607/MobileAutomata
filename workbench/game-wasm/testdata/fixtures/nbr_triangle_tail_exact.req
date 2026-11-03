@@ -1,0 +1,5 @@
+cmd exact
+agents 2
+k 4
+graph 4 0 0-1,1-2,0-2,2-3
+default a2c4n

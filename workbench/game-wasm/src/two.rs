@@ -173,6 +173,103 @@ pub fn a2c5(o: &Obs2) -> Option<(Action, u8)> {
     })
 }
 
+// ------------------------------------------------------------------ a2c4n
+/// `a2c4n`: a four-colour sheet for two agents that do NOT communicate.  Each agent runs its own list of rules ("Agent 1", "Agent 2": the
+/// two programs differ) and acts alone, on what it sees: its own colour, the colours of its neighbours, and the other agent, which it
+/// sees on its own vertex or on a neighbour (and then knows which neighbour and what colour that vertex has).  Nothing else passes
+/// between them.  The adversary activates one agent per step; in every position the sheet reaches only one agent has a rule to
+/// apply, so the order of activation never matters.  Colours: 0 init, 1 head, 2 path, 3 fin.
+pub const NAME_N: &str = "a2c4n";
+pub const NEED_N: u8 = 4;
+
+const NI: u8 = 0;
+const NH: u8 = 1;
+const NP: u8 = 2;
+const NF: u8 = 3;
+
+/// The colour of the vertex the other agent stands on, when that is a neighbour.
+fn partner_colour(o: &Obs2) -> Option<u8> {
+    (0..MAXK as u8).find(|&c| o.cnt[c as usize][1] > 0)
+}
+
+/// What agent `agent` (0 = Agent 1, 1 = Agent 2) does on an observation, and the number of the rule (1-13, in the order of the sheet);
+/// an agent that no rule applies to waits (rule 0).  Conditions on the colours around leave out the vertex of the other agent when it
+/// is a neighbour: `∃A_P, ∄P` means the partner is on a P neighbour and no OTHER neighbour is P.
+pub fn a2c4n(agent: u8, o: &Obs2) -> Option<(Action, u8)> {
+    let mv = |paint: u8, target: u8| Action { paint, target };
+    let other = |c: u8| o.cnt[c as usize][0] > 0; // some neighbour other than the partner's vertex has colour c
+    let near = partner_colour(o);
+    let next_to = |c: u8| near == Some(c); // the partner stands on a neighbour of colour c
+    let deg: u8 = o.cnt.iter().map(|x| x[0]).sum(); // the neighbours other than the partner's vertex
+    let found = if agent == 0 {
+        // Agent 1 acts on path vertices only
+        if o.own != NP {
+            None
+        } else if next_to(NP) {
+            Some((mv(NP, PARTNER), 1)) // the partner is on the next path vertex: follow it
+        } else if o.co && other(NP) && !other(NI) {
+            Some((mv(NF, NP), 2)) // together, nothing left to probe: finish this vertex, back up along the path
+        } else if next_to(NF) {
+            Some((mv(NH, STAY), 3)) // my partner stands on the vertex I have just finished (it is fin now): I am the new head
+        } else if o.co && !other(NI) && !other(NP) && !other(NH) {
+            Some((mv(NF, STOP), 4)) // only fin around: finish the start and stop
+        } else {
+            None
+        }
+    } else {
+        match o.own {
+            NI => {
+                if o.co && deg > 0 && o.cnt[NI as usize][0] == deg {
+                    Some((mv(NP, NI), 5)) // the start: become path, enter an init neighbour
+                } else if next_to(NP) && !other(NP) {
+                    Some((mv(NP, STAY), 6)) // probed: it touches the path only where my partner is: join the path
+                } else if next_to(NP) && other(NP) {
+                    Some((mv(NH, PARTNER), 7)) // probed: it touches the path elsewhere too: mark it head, go back to my partner
+                } else {
+                    None
+                }
+            }
+            NP => {
+                if o.co && other(NI) {
+                    Some((mv(NP, NI), 8)) // together on the path with an init neighbour: probe it
+                } else {
+                    None
+                }
+            }
+            NF => {
+                if next_to(NH) {
+                    Some((mv(NF, PARTNER), 9)) // the partner has become the head: go to it
+                } else if o.co {
+                    Some((mv(NF, STOP), 10)) // together on the finished start: stop
+                } else {
+                    None
+                }
+            }
+            NH => {
+                if o.co && other(NH) {
+                    Some((mv(NH, NH), 11)) // together on the head, a mark next to it: go and clean it up
+                } else if next_to(NH) {
+                    Some((mv(NI, PARTNER), 12)) // a mark next to my partner: become init again, go back to it
+                } else if o.co && !other(NH) {
+                    Some((mv(NP, STAY), 13)) // together on the head, no mark left: become path
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    };
+    Some(found.unwrap_or((mv(o.own, WAIT), 0)))
+}
+
+/// The rule that agent `i` runs in model `m`.
+fn rule_of(m: Model, i: u8, o: &Obs2) -> Option<(Action, u8)> {
+    match m {
+        Model::Neighbour => a2c4n(i, o),
+        _ => a2c5(o),
+    }
+}
+
 // ------------------------------------------------------------------ positions
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub struct Pos2 {
@@ -226,12 +323,12 @@ enum Act2 {
 }
 
 /// `Err` carries an observation the algorithm has no rule for.
-fn act_of(g: &Graph, p: &Pos2, i: u8) -> Result<Act2, Obs2> {
+fn act_of(g: &Graph, p: &Pos2, i: u8, m: Model) -> Result<Act2, Obs2> {
     if p.stopped(i) {
         return Ok(Act2::Stopped);
     }
     let o = observe(g, p.chi, p.at(i), p.at(1 - i));
-    match a2c5(&o) {
+    match rule_of(m, i, &o) {
         None => Err(o),
         Some((a, rule)) => {
             if a.target == WAIT || (a.target == STAY && a.paint == o.own) {
@@ -290,13 +387,13 @@ fn apply(g: &Graph, p: &Pos2, i: u8, a: Action) -> Vec<(Option<u8>, Pos2)> {
 
 /// Every step the adversary can take from `p`: which agent it activates (when the agents are together only agent 0:
 /// the other choice is the mirror image) and where the agent goes.
-fn successors2(g: &Graph, p: &Pos2) -> Result<Vec<(u8, Option<u8>, Pos2)>, Obs2> {
+fn successors2(g: &Graph, p: &Pos2, m: Model) -> Result<Vec<(u8, Option<u8>, Pos2)>, Obs2> {
     let mut out = vec![];
     for i in 0..2u8 {
-        if i == 1 && p.together() {
+        if i == 1 && p.together() && m.identical() {
             continue;
         }
-        if let Act2::Acts(_, a, _) = act_of(g, p, i)? {
+        if let Act2::Acts(_, a, _) = act_of(g, p, i, m)? {
             for (d, q) in apply(g, p, i, a) {
                 out.push((i, d, q));
             }
@@ -306,9 +403,9 @@ fn successors2(g: &Graph, p: &Pos2) -> Result<Vec<(u8, Option<u8>, Pos2)>, Obs2>
 }
 
 /// The agent that acts in `p` for the player and `step`: agent 0 if it has something to do, else agent 1.
-fn enabled(g: &Graph, p: &Pos2) -> Result<Option<(u8, Obs2, Action, u8)>, Obs2> {
+fn enabled(g: &Graph, p: &Pos2, m: Model) -> Result<Option<(u8, Obs2, Action, u8)>, Obs2> {
     for i in 0..2u8 {
-        if let Act2::Acts(o, a, rule) = act_of(g, p, i)? {
+        if let Act2::Acts(o, a, rule) = act_of(g, p, i, m)? {
             return Ok(Some((i, o, a, rule)));
         }
     }
@@ -317,11 +414,13 @@ fn enabled(g: &Graph, p: &Pos2) -> Result<Option<(u8, Obs2, Action, u8)>, Obs2> 
 
 // ------------------------------------------------------------------ the two schedulers
 /// Which rule the two agents run: `Turns` is `a2c5` (the adversary activates one agent per step), `Joint` is `a2c4`
-/// (a rule reads both views and both agents act in the same step; see `joint.rs`).
+/// (a rule reads both views and both agents act in the same step; see `joint.rs`), `Neighbour` is `a2c4n` (the adversary activates
+/// one agent per step, as in `Turns`, but the two agents run different rule lists, so they are not interchangeable).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Model {
     Turns,
     Joint,
+    Neighbour,
 }
 
 impl Model {
@@ -329,6 +428,7 @@ impl Model {
         match rule {
             NAME => Some(Model::Turns),
             super::joint::NAME => Some(Model::Joint),
+            NAME_N => Some(Model::Neighbour),
             _ => None,
         }
     }
@@ -336,20 +436,27 @@ impl Model {
         match self {
             Model::Turns => NAME,
             Model::Joint => super::joint::NAME,
+            Model::Neighbour => NAME_N,
         }
     }
     pub fn need(self) -> u8 {
         match self {
             Model::Turns => NEED,
             Model::Joint => super::joint::NEED,
+            Model::Neighbour => NEED_N,
         }
+    }
+    /// The two agents run the same rule, so when they stand together only agent 0 needs to be stepped (the other choice is the
+    /// mirror image).  Not so for `a2c4n`, whose agents run different lists.
+    fn identical(self) -> bool {
+        self != Model::Neighbour
     }
 }
 
 /// The positions the adversary can take the agents to from `p`.
 fn successors_pos(g: &Graph, p: &Pos2, m: Model) -> Result<Vec<Pos2>, Obs2> {
     match m {
-        Model::Turns => Ok(successors2(g, p)?.into_iter().map(|(_, _, q)| q).collect()),
+        Model::Turns | Model::Neighbour => Ok(successors2(g, p, m)?.into_iter().map(|(_, _, q)| q).collect()),
         Model::Joint => Ok(if over(p) { vec![] } else { super::joint::successors(g, p) }),
     }
 }
@@ -388,7 +495,7 @@ pub enum Outcome2 {
     Unfinished { trace: Trace2 },
 }
 
-fn step_from(g: &Graph, p: &Pos2, i: u8, o: &Obs2, a: Action, rule: u8, next: Option<u8>) -> Step2 {
+fn step_from(g: &Graph, p: &Pos2, i: u8, o: &Obs2, a: Action, rule: u8, next: Option<u8>, k: u8) -> Step2 {
     // the vertices the adversary may serve: the neighbours of the requested colour, or the one vertex of the partner
     // (a single option, so there is no choice to make)
     let options = match a.target {
@@ -403,7 +510,7 @@ fn step_from(g: &Graph, p: &Pos2, i: u8, o: &Obs2, a: Action, rule: u8, next: Op
         }
         t => g.neighbours(p.at(i)).filter(|&u| colour(p.chi, u) == t).collect(),
     };
-    Step2 { agent: i, cur: p.at(i), other: p.at(1 - i), row: o.text(NEED), act: a, rule, options, next, paints: true, second: None }
+    Step2 { agent: i, cur: p.at(i), other: p.at(1 - i), row: o.text(k), act: a, rule, options, next, paints: true, second: None }
 }
 
 /// The step that takes `p` to `q`, one of its successors.
@@ -412,13 +519,13 @@ fn step_between(g: &Graph, p: &Pos2, q: &Pos2, m: Model) -> Step2 {
         return super::joint::step_between(g, p, q);
     }
     for i in 0..2u8 {
-        if i == 1 && p.together() {
+        if i == 1 && p.together() && m.identical() {
             continue;
         }
-        if let Ok(Act2::Acts(o, a, rule)) = act_of(g, p, i) {
+        if let Ok(Act2::Acts(o, a, rule)) = act_of(g, p, i, m) {
             for (d, r) in apply(g, p, i, a) {
                 if r == *q {
-                    return step_from(g, p, i, &o, a, rule, d);
+                    return step_from(g, p, i, &o, a, rule, d, m.need());
                 }
             }
         }
@@ -466,7 +573,7 @@ pub fn exact_game_m(g: &Graph, cap: usize, m: Model) -> Outcome2 {
                     }
                     chain.reverse();
                     let ps: Vec<Pos2> = chain.iter().map(|&c| states[c as usize]).collect();
-                    return Outcome2::Undefined { row: o.text(NEED), path: trace_of(g, &ps, None, m) };
+                    return Outcome2::Undefined { row: o.text(m.need()), path: trace_of(g, &ps, None, m) };
                 }
                 Ok(list) => {
                     for q in list {
@@ -616,8 +723,8 @@ pub fn play_m(g: &Graph, pref: &[u8], budget: usize, m: Model) -> Outcome2 {
             }
             continue;
         }
-        match enabled(g, &p) {
-            Err(o) => return Outcome2::Undefined { row: o.text(NEED), path: trace_of(g, &chain, None, m) },
+        match enabled(g, &p, m) {
+            Err(o) => return Outcome2::Undefined { row: o.text(m.need()), path: trace_of(g, &chain, None, m) },
             Ok(None) => return Outcome2::Fails { positions: 0, method: play_method(pref), trace: trace_of(g, &chain, None, m) },
             Ok(Some((i, _, a, _))) => {
                 let outs = apply(g, &p, i, a);
@@ -715,7 +822,7 @@ fn outcome_json2(g: &Graph, o: &Outcome2) -> String {
 /// 1 = that agent has stopped) for `step`; the rule is the built-in `default a2c5`; `walks` is not offered.
 pub fn handle(r: &Request) -> String {
     let Some(m) = Model::of(&r.default_raw) else {
-        return err(&format!("two agents run a built-in rule: {} or {} (default {})", NAME, super::joint::NAME, NAME));
+        return err(&format!("two agents run a built-in rule: {}, {} or {} (default {})", NAME, super::joint::NAME, NAME_N, NAME));
     };
     if r.k < m.need() {
         return err(&format!("{} needs {} colours (k {})", m.name(), m.need(), m.need()));
@@ -729,6 +836,9 @@ pub fn handle(r: &Request) -> String {
     if r.cmd == "answer" {
         if m == Model::Joint {
             return err("a2c4 reads both agents' views at once, so it has no answer for one row: use step, exact or play");
+        }
+        if m == Model::Neighbour {
+            return err("a2c4n gives the two agents different rules, so one row has no single answer: use step, exact or play");
         }
         let Some(o) = r.row.as_deref().and_then(Obs2::parse) else { return err("row: expected own.bag@p, e.g. 4.20100@h") };
         return match a2c5(&o) {
@@ -783,11 +893,11 @@ pub fn handle(r: &Request) -> String {
                     _ => "{\"status\":\"ok\",\"stuck\":true}".to_string(),
                 };
             }
-            match enabled(g, &p) {
-                Err(o) => format!("{{\"status\":\"ok\",\"row\":{},\"defined\":false}}", js(&o.text(NEED))),
+            match enabled(g, &p, m) {
+                Err(o) => format!("{{\"status\":\"ok\",\"row\":{},\"defined\":false}}", js(&o.text(m.need()))),
                 Ok(None) => "{\"status\":\"ok\",\"stuck\":true}".to_string(),
                 Ok(Some((i, o, a, rule))) => {
-                    let st = step_from(g, &p, i, &o, a, rule, None);
+                    let st = step_from(g, &p, i, &o, a, rule, None, m.need());
                     let auto = auto_choice(g, vis, &st.options);
                     format!(
                         "{{\"status\":\"ok\",\"agent\":{},\"cur\":{},\"other\":{},\"row\":{},\"degree\":{},\"defined\":true,\"source\":\"default\",\"paint\":{},\"target\":{},\"options\":{},\"auto\":{},\"explored\":{},\"rule\":{}}}",
@@ -948,7 +1058,7 @@ mod tests {
                         continue;
                     }
                     for i in 0..2u8 {
-                        if let Act2::Acts(_, a, _) = act_of(&g, &p, i).expect("a row with no rule") {
+                        if let Act2::Acts(_, a, _) = act_of(&g, &p, i, Model::Turns).expect("a row with no rule") {
                             if a.target == PARTNER {
                                 assert_eq!(g.adj[p.at(i) as usize] >> p.at(1 - i) & 1, 1, "partner not adjacent");
                             } else if a.target < NEED {
@@ -956,7 +1066,7 @@ mod tests {
                             }
                         }
                     }
-                    for (_, _, q) in successors2(&g, &p).unwrap() {
+                    for (_, _, q) in successors2(&g, &p, Model::Turns).unwrap() {
                         todo.push(q);
                     }
                 }
@@ -985,6 +1095,160 @@ mod tests {
         assert!(indicators2(&g, &trace(end(0, 1, true, false, 0b111), Some(3), false)).contains("\"stopped\":false"));
         let json = outcome_json2(&g, &Outcome2::Fails { positions: 5, method: "exact game".into(), trace: trace(end(0, 1, false, false, 0b111), None, true) });
         assert!(json.contains("\"reason\":\"stuck\"") && json.contains("\"stuck\":true") && json.contains("\"agents\":2"), "{}", json);
+    }
+
+    // ---------------------------------------------------------------- a2c4n (two agents that do not communicate)
+    fn explores_n(g: &Graph) -> bool {
+        matches!(exact_game_m(g, 20_000_000, Model::Neighbour), Outcome2::Explores { .. })
+    }
+
+    /// (agent, observation, action, rule number): each row derived by hand from the sheet.  Rows read `own.bag@p` with four colours
+    /// (0 init, 1 head, 2 path, 3 fin); the bag counts ALL neighbours of a colour, and `p` is `h` (the partner is on this vertex), the
+    /// colour of the neighbour that holds it, or `-`.
+    #[test]
+    fn a2c4n_rules_on_hand_derived_rows() {
+        let rows: &[(u8, &str, Option<(&str, u8)>)] = &[
+            (1, "0.2000@h", Some(("2>0", 5))),     // Agent 2 on the start: all neighbours init, partner here: become path, enter an init neighbour
+            (0, "0.2000@h", Some(("0>-3", 0))),    // Agent 1 has no rule on an init vertex: it waits
+            (1, "0.0010@2", Some(("2>stay", 6))),  // probed: the only path neighbour is the partner's: join the path
+            (1, "0.0020@2", Some(("1>-4", 7))),    // probed: another path vertex is next door: head, back to the partner
+            (1, "2.1010@h", Some(("2>0", 8))),     // together on a path vertex with an init neighbour: probe it
+            (1, "2.0010@2", Some(("2>-3", 0))),    // Agent 2 on a path vertex with its partner on a path vertex next door: nothing to do
+            (0, "2.0010@2", Some(("2>-4", 1))),    // Agent 1: the partner is on the next path vertex: follow
+            (0, "2.0011@h", Some(("3>2", 2))),     // together, a path neighbour and nothing to probe: finish, back up
+            (0, "2.1011@h", Some(("2>-3", 0))),    // together, but an init neighbour is left: Agent 1 waits for Agent 2 to probe it
+            (0, "2.0011@3", Some(("1>stay", 3))),  // the partner is on a fin neighbour: become the head
+            (0, "2.0003@h", Some(("3>stop", 4))),  // only fin around, together: finish the start and stop
+            (0, "2.0013@h", Some(("3>2", 2))),     // a path neighbour as well: not the start, so back up instead of stopping
+            (1, "3.0100@1", Some(("3>-4", 9))),    // Agent 2 on a fin vertex, the partner became the head next door: go to it
+            (1, "3.0002@h", Some(("3>stop", 10))), // together on the finished start: stop
+            (1, "1.0110@h", Some(("1>1", 11))),    // together on the head, a mark next to it: go and clean it up
+            (1, "1.0210@1", Some(("0>-4", 12))),   // a mark next to my partner (the partner is on a head neighbour): init again, back to it
+            (1, "1.0010@h", Some(("2>stay", 13))), // together on the head, no mark left: become path
+        ];
+        for (agent, text, want) in rows {
+            let o = Obs2::parse(text).unwrap_or_else(|| panic!("row {} does not parse", text));
+            assert_eq!(o.text(4), *text, "text round trip");
+            let got = a2c4n(*agent, &o).map(|(a, n)| {
+                let t = match a.target {
+                    STAY => "stay".to_string(),
+                    STOP => "stop".to_string(),
+                    WAIT => "-3".to_string(),
+                    PARTNER => "-4".to_string(),
+                    c => c.to_string(),
+                };
+                (format!("{}>{}", a.paint, t), n)
+            });
+            assert_eq!(got, want.map(|(a, n)| (a.to_string(), n)), "agent {} on {}", agent, text);
+        }
+    }
+
+    #[test]
+    fn a2c4n_small_graphs_explore() {
+        assert!(explores_n(&graph(2, 0, &[(0, 1)])));
+        assert!(explores_n(&graph(3, 1, &[(0, 1), (1, 2)])));
+        assert!(explores_n(&graph(3, 0, &[(0, 1), (1, 2), (0, 2)])));
+    }
+
+    /// Every connected graph of up to six vertices, every start, against every adversary: the totals of positions come from an independent
+    /// checker (a separate program, `two-agent-neighbour-sheet`, written from the handwritten sheet), so they hold the two to the same game.
+    #[test]
+    fn a2c4n_every_connected_graph_up_to_six_vertices_is_explored() {
+        let expect = [(2usize, 20usize), (3, 174), (4, 1692), (5, 17913), (6, 257755)];
+        for (n, want) in expect {
+            let mut total = 0usize;
+            for edges in super::paper_tests::connected_graphs(n) {
+                for s in 0..n {
+                    let g = graph(n, s, &edges);
+                    match exact_game_m(&g, 20_000_000, Model::Neighbour) {
+                        Outcome2::Explores { positions, .. } => total += positions,
+                        _ => panic!("a2c4n fails on {} {:?} from {}", n, edges, s),
+                    }
+                }
+            }
+            assert_eq!(total, want, "positions enumerated on the connected graphs with {} vertices", n);
+        }
+    }
+
+    /// Seven vertices: 853 graphs, 5,971 graph-start pairs, 5,164,287 positions.  Slow in a debug build: `cargo test --release -- --ignored`.
+    #[test]
+    #[ignore]
+    fn a2c4n_every_connected_graph_on_seven_vertices_is_explored() {
+        let mut total = 0usize;
+        for edges in super::paper_tests::connected_graphs(7) {
+            for s in 0..7 {
+                match exact_game_m(&graph(7, s, &edges), 20_000_000, Model::Neighbour) {
+                    Outcome2::Explores { positions, .. } => total += positions,
+                    _ => panic!("a2c4n fails on 7 {:?} from {}", edges, s),
+                }
+            }
+        }
+        assert_eq!(total, 5_164_287);
+    }
+
+    /// At most one agent has a rule to apply in any position the sheet reaches, so the order of activation never matters; and a rule never
+    /// asks for a colour nobody has or for a partner that is not next door.
+    #[test]
+    fn a2c4n_never_has_two_agents_ready_and_every_request_can_be_served() {
+        for (n, edges) in [(4usize, vec![(0u8, 1u8), (0, 2), (0, 3), (1, 2), (1, 3)]), (5, vec![(0, 1), (1, 2), (2, 3), (3, 4), (0, 4), (1, 3)]), (5, vec![(0, 1), (0, 2), (0, 3), (0, 4), (1, 2), (3, 4)]), (4, vec![(0, 1), (1, 2), (0, 2), (2, 3)])] {
+            for s in 0..n {
+                let g = graph(n, s as usize, &edges);
+                let mut seen: std::collections::HashSet<Pos2> = std::collections::HashSet::new();
+                let mut todo = vec![root(&g)];
+                while let Some(p) = todo.pop() {
+                    if !seen.insert(p) || over(&p) {
+                        continue;
+                    }
+                    let ready = (0..2u8).filter(|&i| matches!(act_of(&g, &p, i, Model::Neighbour), Ok(Act2::Acts(..)))).count();
+                    assert!(ready <= 1, "both agents have a rule to apply on {:?}", p);
+                    for i in 0..2u8 {
+                        if let Act2::Acts(_, a, _) = act_of(&g, &p, i, Model::Neighbour).expect("a2c4n always has an answer") {
+                            if a.target == PARTNER {
+                                assert_eq!(g.adj[p.at(i) as usize] >> p.at(1 - i) & 1, 1, "partner not adjacent");
+                            } else if a.target < NEED_N {
+                                assert!(g.neighbours(p.at(i)).any(|u| colour(p.chi, u) == a.target), "a colour no neighbour has");
+                            }
+                        }
+                    }
+                    for (_, _, q) in successors2(&g, &p, Model::Neighbour).unwrap() {
+                        todo.push(q);
+                    }
+                }
+            }
+        }
+    }
+
+    /// A hand trace: the path 0-1-2 from 0, derived by hand from the sheet (Agent 1 = agent 0, Agent 2 = agent 1).
+    ///  1  Agent 2  rule 5   at 0 (init, together, all init around): paint 0 path, enter 1
+    ///  2  Agent 2  rule 6   at 1, the partner next door on the path and no other path vertex: paint 1 path, stay
+    ///  3  Agent 1  rule 1   at 0: the partner is on a path vertex: follow to 1
+    ///  4  Agent 2  rule 8   at 1 together with an init neighbour: probe 2
+    ///  5  Agent 2  rule 6   at 2: paint 2 path, stay
+    ///  6  Agent 1  rule 1   at 1: follow to 2
+    ///  7  Agent 1  rule 2   at 2 together, no init neighbour: paint 2 fin, back up to 1
+    ///  8  Agent 1  rule 3   at 1, the partner on a fin vertex: become head
+    ///  9  Agent 2  rule 9   at 2 (fin), the partner is the head next door: go to 1
+    /// 10  Agent 2  rule 13  at 1 together on the head, no mark: become path
+    /// 11  Agent 1  rule 2   at 1 together, nothing to probe: paint 1 fin, back up to 0
+    /// 12  Agent 1  rule 3   at 0: become head
+    /// 13  Agent 2  rule 9   at 1 (fin): go to 0
+    /// 14  Agent 2  rule 13  at 0 together on the head: become path
+    /// 15  Agent 1  rule 4   at 0 together, only fin around: paint 0 fin and stop
+    /// 16  Agent 2  rule 10  at 0 (fin) with Agent 1: stop
+    #[test]
+    fn a2c4n_hand_trace_on_a_path() {
+        let g = graph(3, 0, &[(0, 1), (1, 2)]);
+        match play_m(&g, &[], 1000, Model::Neighbour) {
+            Outcome2::Explores { trace, .. } => {
+                let rules: Vec<u8> = trace.steps.iter().map(|s| s.rule).collect();
+                let agents: Vec<u8> = trace.steps.iter().map(|s| s.agent).collect();
+                assert_eq!(rules, vec![5, 6, 1, 8, 6, 1, 2, 3, 9, 13, 2, 3, 9, 13, 4, 10]);
+                assert_eq!(agents, vec![1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1]);
+                assert!(trace.end.ta && trace.end.tb && trace.end.a == 0 && trace.end.b == 0);
+                assert_eq!(trace.end.chi, (3u128) | (3 << 4) | (3 << 8), "all three vertices finished");
+            }
+            _ => panic!("the play must explore"),
+        }
     }
 
     /// A hand trace: the path 0-1-2 from 0, derived by hand from the rules (agent 0 works, agent 1 follows).
